@@ -1,0 +1,46 @@
+services:
+  # Career Mentor API
+  api:
+    build: .
+    container_name: career-mentor-api
+    ports:
+      - "8085:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://myuser:mypassword@db:5432/career_mentor_db
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - career-mentor-network
+
+  # PostgreSQL Database with pgvector extension
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: postgres
+    environment:
+      POSTGRES_DB: career_mentor_db
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U myuser" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - career-mentor-network
+
+volumes:
+  pgdata:
+
+
+networks:
+  career-mentor-network:
+    driver: bridge
