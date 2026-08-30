@@ -69,3 +69,32 @@ test('onboarding is usable on a mobile viewport and keeps focus in the current s
   await expect(page.getByRole('heading', { name: 'Where are you starting from?' })).toBeFocused()
   await expect(page.getByText('Step 2 of 5')).toBeVisible()
 })
+
+test('saved onboarding can retry roadmap generation without repeating answers', async ({ page }) => {
+  await page.route('**/v1/roadmaps', async (route) => {
+    await route.fulfill({ status: 503, json: { error: { code: 'PROVIDER_UNAVAILABLE', message: 'Roadmap generation is temporarily unavailable.' } } })
+  })
+  await page.goto('/onboarding')
+
+  await page.getByLabel('What do you want to achieve?').fill('I want to become a backend engineer within twelve months.')
+  await page.getByLabel('Target role').fill('Backend Engineer')
+  await page.getByLabel('Learning objective').fill('Design, test, and deploy reliable APIs')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByRole('heading', { name: 'Where are you starting from?' })).toBeVisible()
+
+  await page.getByLabel('Current role').fill('Frontend Developer')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByRole('heading', { name: 'What have you already learned?' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByRole('heading', { name: 'How should learning fit your life?' })).toBeVisible()
+  await page.getByLabel('Hours available each week').fill('8')
+  await page.getByRole('button', { name: 'Continue' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Review your learning profile' })).toBeVisible()
+  await page.getByRole('button', { name: 'Confirm and create roadmap' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('Your profile is saved.')
+  await expect(page.getByRole('button', { name: 'Retry roadmap generation' })).toBeVisible()
+  await expect(page.getByText('Backend Engineer')).toBeVisible()
+})
