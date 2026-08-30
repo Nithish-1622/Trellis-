@@ -174,20 +174,20 @@ const Chat: React.FC = () => {
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         components={{
-                                            p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
-                                            ul: ({ children }: any) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                                            ol: ({ children }: any) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                                            li: ({ children }: any) => <li className="mb-1">{children}</li>,
-                                            a: ({ href, children }: any) => (
+                                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                            ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                                            ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                                            li: ({ children }) => <li className="mb-1">{children}</li>,
+                                            a: ({ href, children }) => (
                                                 <a href={href} target="_blank" rel="noopener noreferrer" className={`underline underline-offset-2 ${message.sender === 'user' ? 'text-white' : 'text-indigo-500 hover:text-indigo-400'}`}>
                                                     {children}
                                                 </a>
                                             ),
-                                            h1: ({ children }: any) => <h1 className="text-lg font-bold mb-2 mt-4 first:mt-0">{children}</h1>,
-                                            h2: ({ children }: any) => <h2 className="text-base font-bold mb-2 mt-4 first:mt-0">{children}</h2>,
-                                            h3: ({ children }: any) => <h3 className="text-sm font-bold mb-2 mt-4 first:mt-0">{children}</h3>,
-                                            blockquote: ({ children }: any) => <blockquote className={`border-l-4 pl-3 italic mb-2 ${message.sender === 'user' ? 'border-indigo-400' : 'border-zinc-300 dark:border-zinc-600'}`}>{children}</blockquote>,
-                                            code: ({ children, className }: any) => {
+                                            h1: ({ children }) => <h1 className="text-lg font-bold mb-2 mt-4 first:mt-0">{children}</h1>,
+                                            h2: ({ children }) => <h2 className="text-base font-bold mb-2 mt-4 first:mt-0">{children}</h2>,
+                                            h3: ({ children }) => <h3 className="text-sm font-bold mb-2 mt-4 first:mt-0">{children}</h3>,
+                                            blockquote: ({ children }) => <blockquote className={`border-l-4 pl-3 italic mb-2 ${message.sender === 'user' ? 'border-indigo-400' : 'border-zinc-300 dark:border-zinc-600'}`}>{children}</blockquote>,
+                                            code: ({ children, className }) => {
                                                 // Basic check for inline code vs block code could be done here if needed
                                                 // But for simplicity, we treat them similarly unless it's a pre block
                                                 const isInline = !className;
@@ -199,7 +199,7 @@ const Chat: React.FC = () => {
                                                     </code>
                                                 );
                                             },
-                                            pre: ({ children }: any) => (
+                                            pre: ({ children }) => (
                                                 <pre className={`p-3 rounded-lg overflow-x-auto mb-3 text-sm font-mono ${message.sender === 'user' ? 'bg-indigo-900/50 text-zinc-100' : 'bg-zinc-100 dark:bg-zinc-900/80 text-zinc-800 dark:text-zinc-300'}`}>
                                                     {children}
                                                 </pre>

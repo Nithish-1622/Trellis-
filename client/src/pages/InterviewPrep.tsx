@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useThemeContext } from '../hooks/useThemeContext';
 import { useAuth } from '../hooks/useAuth';
 import { startInterview, submitInterviewAnswer, getInterviewReport } from '../services/agentService';
+import type { InterviewReport } from '../services/agentService';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 
 const InterviewPrep: React.FC = () => {
@@ -28,7 +29,7 @@ const InterviewPrep: React.FC = () => {
     const MAX_QUESTIONS = 5;
 
     // Report State
-    const [report, setReport] = useState<any>(null);
+    const [report, setReport] = useState<InterviewReport | null>(null);
 
     const handleStart = async () => {
         if (!user) return;

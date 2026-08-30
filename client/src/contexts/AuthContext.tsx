@@ -4,23 +4,7 @@ import { ID, OAuthProvider } from 'appwrite';
 import type { Models } from 'appwrite';
 import { AuthContext } from './auth-context';
 import type { LearnerPreferences } from './auth-context';
-
-interface AppwriteError {
-    code?: number
-    message?: string
-}
-
-const toAppwriteError = (error: unknown): AppwriteError => {
-    if (typeof error === 'object' && error !== null) {
-        const candidate = error as Record<string, unknown>
-        return {
-            code: typeof candidate.code === 'number' ? candidate.code : undefined,
-            message: typeof candidate.message === 'string' ? candidate.message : undefined,
-        }
-    }
-
-    return {}
-}
+import { getErrorCode, getErrorMessage } from '../utils/errors';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<Models.User<LearnerPreferences> | null>(null);
@@ -50,9 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const accountDetails = await account.get<LearnerPreferences>();
             setUser(accountDetails);
         } catch (error: unknown) {
-            const err = toAppwriteError(error)
+            const errorCode = getErrorCode(error)
+            const errorMessage = getErrorMessage(error, 'Login failed')
             // If a session is already active, we should logout the previous user and try logging in again
-            if (err?.message?.includes('prohibited when a session is active') || err?.code === 401) {
+            if (errorMessage.includes('prohibited when a session is active') || errorCode === 401) {
                 try {
                     await account.deleteSession('current');
                     // Retry login
@@ -61,13 +46,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setUser(accountDetails);
                     return;
                 } catch (retryError: unknown) {
-                    const retryErr = toAppwriteError(retryError)
-                    setError(retryErr.message || 'Login failed after retry');
+                    setError(getErrorMessage(retryError, 'Login failed after retry'));
                     throw retryError;
                 }
             }
 
-            setError(err.message || 'Login failed');
+            setError(errorMessage);
             throw error;
         } finally {
             setLoading(false);
@@ -81,8 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await account.create(ID.unique(), email, password, name);
             await login(email, password);
         } catch (error: unknown) {
-            const err = toAppwriteError(error)
-            setError(err.message || 'Registration failed');
+            setError(getErrorMessage(error, 'Registration failed'));
             throw error;
         } finally {
             setLoading(false);
@@ -95,8 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await account.deleteSession('current');
             setUser(null);
         } catch (error: unknown) {
-            const err = toAppwriteError(error)
-            setError(err.message || 'Logout failed');
+            setError(getErrorMessage(error, 'Logout failed'));
         } finally {
             setLoading(false);
         }

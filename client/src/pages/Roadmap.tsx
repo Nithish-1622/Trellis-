@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useThemeContext } from '../hooks/useThemeContext';
 import { useAuth } from '../hooks/useAuth';
 import RoadmapNavbar from '../components/roadmap-components/RoadmapNavbar';
@@ -20,6 +20,14 @@ interface RoadmapNode {
     };
 }
 
+const normalizeMilestoneStatus = (status: string | undefined, index: number): RoadmapNode['status'] => {
+    const normalized = status?.toLowerCase();
+    if (normalized === 'completed' || normalized === 'current' || normalized === 'locked') {
+        return normalized;
+    }
+    return index === 0 ? 'current' : 'locked';
+};
+
 const Roadmap: React.FC = () => {
     const { darkMode, toggleTheme } = useThemeContext();
     const { user } = useAuth();
@@ -28,7 +36,7 @@ const Roadmap: React.FC = () => {
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchRoadmap = async () => {
+    const fetchRoadmap = useCallback(async () => {
         if (!user?.$id) return;
         setLoading(true);
         setError(null);
@@ -36,10 +44,10 @@ const Roadmap: React.FC = () => {
             const data = await getCurrentRoadmap(user.$id);
             if (data && data.milestones) {
                 // Map backend data to RoadmapNode
-                const mappedNodes: RoadmapNode[] = data.milestones.map((step: any, index: number) => ({
+                const mappedNodes: RoadmapNode[] = data.milestones.map((step, index) => ({
                     id: (index + 1).toString(),
                     title: step.title,
-                    status: step.status?.toLowerCase() || (index === 0 ? 'current' : 'locked'),
+                    status: normalizeMilestoneStatus(step.status, index),
                     description: step.description,
                     position: { x: (index % 2 === 0 ? 50 : (index % 4 === 1 ? 20 : 80)), y: 10 + (index * 20) }, // Simple zigzag layout logic
                     details: {
@@ -60,7 +68,7 @@ const Roadmap: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user?.$id]);
 
     const handleRegenerate = async () => {
         if (!user?.$id) return;
@@ -80,7 +88,7 @@ const Roadmap: React.FC = () => {
         if (user?.$id) {
             fetchRoadmap();
         }
-    }, [user?.$id]);
+    }, [fetchRoadmap, user?.$id]);
 
     return (
         <div className={`min-h-screen font-sans transition-all duration-700 ease-in-out ${darkMode ? 'bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'}`}>

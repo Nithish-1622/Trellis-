@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeContext } from '../../hooks/useThemeContext';
 import { useAuth } from '../../hooks/useAuth';
+import { getErrorMessage } from '../../utils/errors';
 
 const RegisterForm: React.FC = () => {
     const navigate = useNavigate();
@@ -30,9 +31,9 @@ const RegisterForm: React.FC = () => {
         try {
             await register(email, pass, name);
             navigate('/onboarding');
-        } catch (err: any) {
-            console.error(err);
-            setRegisterError(err.message || "Failed to create account");
+        } catch (error: unknown) {
+            console.error(error);
+            setRegisterError(getErrorMessage(error, 'Failed to create account'));
         }
     };
 

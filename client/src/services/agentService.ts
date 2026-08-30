@@ -4,6 +4,78 @@ export interface AgentMessageResponse {
     content?: string;
 }
 
+export interface LearningResource {
+    title: string
+    type: string
+    description?: string
+    difficulty?: string
+    duration?: string
+    platform?: string
+    url?: string
+}
+
+export interface LearningResourcesResponse {
+    resources: LearningResource[]
+    total_resources?: number
+}
+
+export interface SalaryRange {
+    min?: number
+    max?: number
+}
+
+export interface JobRecommendation {
+    title: string
+    company: string
+    location: string
+    job_type?: string
+    salary_range?: SalaryRange
+    required_skills?: string[]
+    posted_date?: string
+    match_score: number
+    url?: string
+}
+
+export interface JobRecommendationsResponse {
+    jobs: JobRecommendation[]
+    total_recommendations?: number
+}
+
+export interface RoadmapMilestone {
+    title: string
+    description: string
+    status?: string
+    skills_to_learn?: string[]
+    estimated_hours?: number
+}
+
+export interface RoadmapResponse {
+    milestones: RoadmapMilestone[]
+}
+
+export interface MemorySummaryResponse {
+    skills?: string[]
+    completed_milestones?: number
+    total_applications?: number
+    current_focus?: string | null
+    resume_filename?: string
+}
+
+export interface InterviewInteractionResponse {
+    session_id: string
+    question: string
+    state?: string
+    previous_feedback?: string
+    previous_score?: number
+}
+
+export interface InterviewReport {
+    overall_score: number
+    summary: string
+    strengths: string[]
+    improvements: string[]
+}
+
 export const sendMessageToAgent = async (userId: string, message: string, retries = 3, delay = 1000): Promise<string> => {
     for (let i = 0; i < retries; i++) {
         try {
@@ -29,7 +101,7 @@ export const sendMessageToAgent = async (userId: string, message: string, retrie
                     } else {
                         errorMessage = `Server Error: ${JSON.stringify(jsonError)}`;
                     }
-                } catch (e) {
+                } catch {
                     errorMessage = `Server Error: ${errorData}`;
                 }
 
@@ -54,7 +126,7 @@ export const sendMessageToAgent = async (userId: string, message: string, retrie
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
 
-export const parseResume = async (userId: string, file: File, fileId?: string): Promise<any> => {
+export const parseResume = async (userId: string, file: File, fileId?: string): Promise<Record<string, unknown>> => {
     const formData = new FormData();
     formData.append('file', file);
     if (fileId) {
@@ -74,7 +146,7 @@ export const parseResume = async (userId: string, file: File, fileId?: string): 
     return await response.json();
 };
 
-export const recommendJobs = async (userId: string, limit: number = 5): Promise<any> => {
+export const recommendJobs = async (userId: string, limit: number = 5): Promise<JobRecommendationsResponse> => {
     const response = await fetch(`${API_BASE_URL}/agent/jobs/recommend`, {
         method: 'POST',
         headers: {
@@ -94,7 +166,7 @@ export const recommendJobs = async (userId: string, limit: number = 5): Promise<
     return await response.json();
 };
 
-export const getLearningResources = async (skill: string, level: string = 'Beginner', resourceTypes: string[] = ['course', 'tutorial', 'video', 'project']): Promise<any> => {
+export const getLearningResources = async (skill: string, level: string = 'Beginner', resourceTypes: string[] = ['course', 'tutorial', 'video', 'project']): Promise<LearningResourcesResponse> => {
     const response = await fetch(`${API_BASE_URL}/agent/resources/learning`, {
         method: 'POST',
         headers: {
@@ -115,7 +187,7 @@ export const getLearningResources = async (skill: string, level: string = 'Begin
     return await response.json();
 };
 
-export const getCurrentRoadmap = async (userId: string): Promise<any> => {
+export const getCurrentRoadmap = async (userId: string): Promise<RoadmapResponse> => {
     const response = await fetch(`${API_BASE_URL}/agent/roadmap/current?user_id=${userId}`);
 
     if (response.status === 404) {
@@ -130,7 +202,7 @@ export const getCurrentRoadmap = async (userId: string): Promise<any> => {
     return await response.json();
 };
 
-export const regenerateRoadmap = async (userId: string, focusArea: string = "AI Engineering", activeHoursPerWeek: number = 10, currentLevel: string = "intermediate"): Promise<any> => {
+export const regenerateRoadmap = async (userId: string, focusArea: string = "AI Engineering", activeHoursPerWeek: number = 10, currentLevel: string = "intermediate"): Promise<RoadmapResponse> => {
     const response = await fetch(`${API_BASE_URL}/agent/roadmap/regenerate`, {
         method: 'POST',
         headers: {
@@ -152,7 +224,7 @@ export const regenerateRoadmap = async (userId: string, focusArea: string = "AI 
     return await response.json();
 };
 
-export const getMemorySummary = async (userId: string): Promise<any> => {
+export const getMemorySummary = async (userId: string): Promise<MemorySummaryResponse> => {
     const response = await fetch(`${API_BASE_URL}/agent/memory/summary?user_id=${userId}`);
 
     if (!response.ok) {
@@ -164,7 +236,7 @@ export const getMemorySummary = async (userId: string): Promise<any> => {
 };
 
 // Interview Services
-export const startInterview = async (userId: string, targetRole: string, focusArea: string = "General"): Promise<any> => {
+export const startInterview = async (userId: string, targetRole: string, focusArea: string = "General"): Promise<InterviewInteractionResponse> => {
     const response = await fetch(`${API_BASE_URL}/agent/interview/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,7 +251,7 @@ export const startInterview = async (userId: string, targetRole: string, focusAr
     return await response.json();
 };
 
-export const submitInterviewAnswer = async (userId: string, sessionId: string, answer: string): Promise<any> => {
+export const submitInterviewAnswer = async (userId: string, sessionId: string, answer: string): Promise<InterviewInteractionResponse> => {
     const response = await fetch(`${API_BASE_URL}/agent/interview/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,9 +265,8 @@ export const submitInterviewAnswer = async (userId: string, sessionId: string, a
     return await response.json();
 };
 
-export const getInterviewReport = async (sessionId: string): Promise<any> => {
+export const getInterviewReport = async (sessionId: string): Promise<InterviewReport> => {
     const response = await fetch(`${API_BASE_URL}/agent/interview/report/${sessionId}`);
     if (!response.ok) throw new Error("Failed to get report");
     return await response.json();
 };
-

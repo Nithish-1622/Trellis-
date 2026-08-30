@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { getLearningResources } from '../../services/agentService';
+
+const getImageForCourse = (title: string, type: string) => {
+    const normalizedTitle = title.toLowerCase();
+    if (type === 'video') return "https://images.unsplash.com/photo-1492619882492-866d4d623756?auto=format&fit=crop&q=80&w=600";
+    if (normalizedTitle.includes('web') || normalizedTitle.includes('react')) return "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=600";
+    if (normalizedTitle.includes('data') || normalizedTitle.includes('python')) return "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=600";
+    if (normalizedTitle.includes('design') || normalizedTitle.includes('ui')) return "https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&q=80&w=600";
+    if (normalizedTitle.includes('manager') || normalizedTitle.includes('product')) return "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=600";
+    return "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&q=80&w=600";
+};
 
 interface Course {
     id: string; // Changed to string as it might be a URL or generated ID
@@ -25,24 +35,13 @@ const CourseExplorer: React.FC<CourseExplorerProps> = ({ darkMode }) => {
     const [skill, setSkill] = useState("Artificial Intelligence"); // Default skill
     const [level, setLevel] = useState("beginner");
 
-    // Course images mapping based on keywords (simple placeholder logic)
-    const getImageForCourse = (title: string, type: string) => {
-        const t = title.toLowerCase();
-        if (type === 'video') return "https://images.unsplash.com/photo-1492619882492-866d4d623756?auto=format&fit=crop&q=80&w=600";
-        if (t.includes('web') || t.includes('react')) return "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=600";
-        if (t.includes('data') || t.includes('python')) return "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=600";
-        if (t.includes('design') || t.includes('ui')) return "https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&q=80&w=600";
-        if (t.includes('manager') || t.includes('product')) return "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=600";
-        return "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&q=80&w=600";
-    };
-
-    const fetchCourses = async () => {
+    const fetchCourses = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
             const data = await getLearningResources(skill, level);
             if (data && data.resources) {
-                const mappedCourses: Course[] = data.resources.map((res: any, index: number) => ({
+                const mappedCourses: Course[] = data.resources.map((res, index) => ({
                     id: res.url || index.toString(),
                     title: res.title,
                     description: res.description || `Learn ${skill} with this comprehensive ${res.type}.`,
@@ -57,14 +56,14 @@ const CourseExplorer: React.FC<CourseExplorerProps> = ({ darkMode }) => {
             } else {
                 setCourses([]);
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error fetching courses:", err);
             setError("Failed to load learning resources. Please try again.");
             setCourses([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [level, skill]);
 
     useEffect(() => {
         // Debounce fetching or just fetch on mount/change
@@ -72,7 +71,7 @@ const CourseExplorer: React.FC<CourseExplorerProps> = ({ darkMode }) => {
             fetchCourses();
         }, 500);
         return () => clearTimeout(timer);
-    }, [skill, level]);
+    }, [fetchCourses]);
 
     const handleEnroll = (url?: string) => {
         if (url) window.open(url, '_blank');

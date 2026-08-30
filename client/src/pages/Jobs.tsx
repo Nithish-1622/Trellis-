@@ -5,6 +5,39 @@ import BackgroundGradients from '../components/landing-page-components/Backgroun
 import { Link } from 'react-router-dom';
 import Jobs3DVisual from '../components/jobs-components/Jobs3DVisual';
 import { recommendJobs } from '../services/agentService';
+import type { SalaryRange } from '../services/agentService';
+
+const logoColors = [
+    'from-blue-500 to-cyan-500',
+    'from-purple-500 to-pink-500',
+    'from-emerald-500 to-teal-500',
+    'from-indigo-500 to-blue-500',
+    'from-red-500 to-orange-500',
+    'from-violet-500 to-purple-500',
+    'from-orange-400 to-amber-500',
+    'from-slate-500 to-zinc-500',
+    'from-pink-500 to-rose-500',
+    'from-blue-400 to-green-400',
+    'from-green-500 to-emerald-500',
+    'from-rose-500 to-pink-500',
+];
+
+const getLogoColor = (index: number) => logoColors[index % logoColors.length];
+
+const formatSalary = (salaryRange?: SalaryRange) => {
+    if (!salaryRange || (!salaryRange.min && !salaryRange.max)) return 'Competitive';
+    const formatK = (num: number) => `$${Math.round(num / 1000)}k`;
+    if (salaryRange.min && salaryRange.max) {
+        return `${formatK(salaryRange.min)} - ${formatK(salaryRange.max)}`;
+    }
+    return formatK(salaryRange.min || salaryRange.max || 0);
+};
+
+const formatJobType = (jobType?: string): Job['type'] => {
+    if (jobType === 'INTERN' || jobType === 'Internship') return 'Internship';
+    if (jobType === 'CONTRACTOR' || jobType === 'Contract') return 'Contract';
+    return 'Full-time';
+};
 
 interface Job {
     id: string;
@@ -28,35 +61,7 @@ const Jobs: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const logoColors = [
-        'from-blue-500 to-cyan-500',
-        'from-purple-500 to-pink-500',
-        'from-emerald-500 to-teal-500',
-        'from-indigo-500 to-blue-500',
-        'from-red-500 to-orange-500',
-        'from-violet-500 to-purple-500',
-        'from-orange-400 to-amber-500',
-        'from-slate-500 to-zinc-500',
-        'from-pink-500 to-rose-500',
-        'from-blue-400 to-green-400',
-        'from-green-500 to-emerald-500',
-        'from-rose-500 to-pink-500'
-    ];
-
-    const getLogoColor = (index: number) => {
-        return logoColors[index % logoColors.length];
-    };
-
-    const formatSalary = (salaryRange: any) => {
-        if (!salaryRange || (!salaryRange.min && !salaryRange.max)) return 'Competitive';
-        const formatK = (num: number) => `$${Math.round(num / 1000)}k`;
-        if (salaryRange.min && salaryRange.max) {
-            return `${formatK(salaryRange.min)} - ${formatK(salaryRange.max)}`;
-        }
-        return formatK(salaryRange.min || salaryRange.max);
-    };
-
-    const formatDate = (dateString: string) => {
+    const formatDate = (dateString?: string) => {
         if (!dateString) return 'Recently';
         const date = new Date(dateString);
         const now = new Date();
@@ -78,14 +83,12 @@ const Jobs: React.FC = () => {
                 setLoading(true);
                 const data = await recommendJobs(user.$id);
                 // Map API response to Job interface
-                const mappedJobs: Job[] = data.jobs.map((job: any, index: number) => ({
+                const mappedJobs: Job[] = data.jobs.map((job, index) => ({
                     id: job.url || index.toString(), // Use URL or index as ID
                     title: job.title,
                     company: job.company,
                     location: job.location,
-                    type: (job.job_type === 'FULLTIME' ? 'Full-time' :
-                        job.job_type === 'INTERN' ? 'Internship' :
-                            job.job_type ? job.job_type : 'Full-time') as any,
+                    type: formatJobType(job.job_type),
                     salary: formatSalary(job.salary_range),
                     tags: (job.required_skills || []).slice(0, 3), // Take top 3 skills
                     posted: formatDate(job.posted_date),
@@ -95,7 +98,7 @@ const Jobs: React.FC = () => {
                 }));
 
                 setJobs(mappedJobs);
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error('Error fetching jobs:', err);
                 setError('Failed to load job recommendations');
             } finally {

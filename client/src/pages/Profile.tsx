@@ -47,7 +47,7 @@ const Profile: React.FC = () => {
                     skillsCount: data.skills?.length || 0,
                     milestonesCompleted: data.completed_milestones || 0,
                     applicationsTracked: data.total_applications || 0,
-                    currentFocus: data.current_focus // Allow null
+                    currentFocus: data.current_focus ?? null
                 });
                 if (data.resume_filename) {
                     setResumeName(data.resume_filename);
