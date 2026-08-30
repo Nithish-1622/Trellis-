@@ -156,6 +156,16 @@ Trellis is a full-stack career mentorship platform that combines the power of AI
     docker compose -f compose.yaml -f compose.dev.yaml down
     ```
 
+    The same workflows are available as shorter Make targets:
+
+    ```bash
+    make prod       # production
+    make dev        # development with live reload
+    make down       # stop production
+    make dev-down   # stop development
+    make help       # list all shortcuts
+    ```
+
 ## 📡 API Endpoints
 
 ### Health & Status
