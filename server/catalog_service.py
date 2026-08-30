@@ -19,6 +19,7 @@ from catalog_schemas import (
 from database import LearningHistory, LearningResource
 from errors import APIError
 from profile_service import LearnerProfileService
+from resource_providers import ExternalResource
 
 
 def _terms(values: list[str]) -> set[str]:
@@ -117,6 +118,58 @@ class CatalogService:
         self.db.commit()
         return RecommendationPage(items=recommendations, total=len(ranked), limit=limit, offset=offset)
 
+    @staticmethod
+    def merge_external(
+        page: RecommendationPage,
+        external: list[ExternalResource],
+        limit: int,
+    ) -> RecommendationPage:
+        existing_urls = {item.url for item in page.items}
+        now = datetime.utcnow()
+        merged = list(page.items)
+        for item in external:
+            url = str(item.url)
+            if url in existing_urls:
+                continue
+            existing_urls.add(url)
+            merged.append(ResourceRecommendation(
+                id=f"{item.provider}:{item.external_id}",
+                provider=item.provider,
+                external_id=item.external_id,
+                resource_type=item.resource_type,
+                title=item.title,
+                description=item.description,
+                level=None,
+                duration_minutes=None,
+                topics=item.topics,
+                prerequisites=[],
+                cost_type="free",
+                price=None,
+                currency=None,
+                language=item.language,
+                url=url,
+                thumbnail_url=str(item.thumbnail_url) if item.thumbnail_url else None,
+                verification_status="provider",
+                verified_by=None,
+                verified_at=None,
+                archived_at=None,
+                link_status="provider",
+                metadata=item.metadata,
+                created_at=now,
+                updated_at=now,
+                score=0.55,
+                explanation=f"Current {item.provider.title()} resource retrieved for your active learning goal.",
+                provenance=item.provider,
+                prerequisite_status="ready",
+            ))
+        merged.sort(key=lambda item: (-item.score, item.title.casefold()))
+        return RecommendationPage(
+            items=merged[:limit],
+            total=page.total + len(external),
+            limit=limit,
+            offset=page.offset,
+        )
+
     def _get(self, resource_id: str) -> LearningResource:
         resource = self.db.get(LearningResource, resource_id)
         if resource is None:
@@ -136,4 +189,3 @@ class CatalogService:
         elif "verification_status" in data and data["verification_status"] != "verified":
             resource.verified_by = None
             resource.verified_at = None
-

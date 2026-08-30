@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from auth import AuthenticatedUser, get_current_user
 from database import Base, LearningResource, get_db
 from main import app
+from resource_providers import ExternalResource, get_hybrid_resource_provider
 
 
 @pytest.fixture
@@ -95,7 +96,7 @@ def test_recommendations_only_return_verified_real_catalog_urls(catalog_client):
     }
     assert client.post("/v1/me/onboarding", json=onboarding).status_code == 200
 
-    response = client.get("/v1/resources/recommendations")
+    response = client.get("/v1/resources/recommendations?include_live=false")
 
     assert response.status_code == 200
     assert response.json()["total"] == 1
@@ -112,3 +113,25 @@ def test_catalog_rejects_non_http_resource_urls(catalog_client):
     response = client.post("/v1/admin/resources", json=payload)
 
     assert response.status_code == 422
+
+
+def test_recommendations_merge_validated_live_resources_and_keep_catalog_fallback(catalog_client):
+    client, _db, identity = catalog_client
+    assert client.post("/v1/admin/resources", json=resource_payload()).status_code == 201
+    identity["user"] = AuthenticatedUser(user_id="learner", email="learner@example.com", name="Learner", roles=["learner"])
+
+    class StubProvider:
+        async def search(self, query: str, limit: int):
+            assert "Backend Engineer" in query
+            assert limit <= 25
+            return [ExternalResource(provider="youtube", external_id="video-1", resource_type="video", title="Backend API design", description="A current walkthrough", url="https://www.youtube.com/watch?v=video-1", topics=["APIs"])]
+
+    app.dependency_overrides[get_hybrid_resource_provider] = lambda: StubProvider()
+    profile = {"current_step": "review", "completed_steps": ["goal", "current_position", "previous_learning", "preferences"], "complete": True, "draft": {"goal": {"free_text": "Become a backend engineer this year", "target_role": "Backend Engineer", "objective": "Build APIs"}, "current_position": {"interests": [], "skills": []}, "previous_learning": {"courses": []}, "preferences": {"preferred_formats": [], "weekly_hours": 8, "accessibility_needs": []}}}
+    assert client.post("/v1/me/onboarding", json=profile).status_code == 200
+
+    response = client.get("/v1/resources/recommendations?include_live=true")
+
+    assert response.status_code == 200
+    provenances = {item["provenance"] for item in response.json()["items"]}
+    assert provenances == {"verified_catalog", "youtube"}

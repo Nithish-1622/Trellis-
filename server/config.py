@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # JSearch API (RapidAPI)
     JSEARCH_API_KEY: str = ""
     JSEARCH_API_HOST: str = "jsearch.p.rapidapi.com"
+
+    # Supplemental learning resource providers
+    YOUTUBE_API_KEY: str = ""
+    GITHUB_TOKEN: str = ""
+    PROVIDER_TIMEOUT_SECONDS: float = 8.0
     
     # LangSmith (Optional)
     LANGCHAIN_TRACING_V2: bool = False
