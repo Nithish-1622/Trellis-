@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
-from database import Base, LearnerSkill, SkillEvidence, UserProfile, get_db
+from database import Base, LearnerSkill, ResourceJob, SkillEvidence, UserProfile, get_db
 from main import app
 from goal_analyzer import get_goal_analyzer
 from profile_schemas import GoalAnalysisResponse
@@ -140,6 +140,7 @@ def test_onboarding_completion_is_idempotent_and_persists_normalized_profile(onb
     assert profile.json()["weekly_hours"] == 8
     assert profile.json()["is_onboarding_complete"] is True
     assert db.query(LearnerSkill).count() == 1
+    assert db.query(ResourceJob).filter_by(job_type="discovery").count() == 1
 
 
 def test_confirmed_resume_capabilities_persist_once_with_provenance(onboarding_client):

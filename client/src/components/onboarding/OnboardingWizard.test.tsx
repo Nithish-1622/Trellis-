@@ -8,12 +8,14 @@ const { getOnboarding, saveOnboarding, analyzeGoal } = vi.hoisted(() => ({
   analyzeGoal: vi.fn(),
 }))
 const { createRoadmap } = vi.hoisted(() => ({ createRoadmap: vi.fn() }))
+const { discoverResources, waitForDiscovery } = vi.hoisted(() => ({ discoverResources: vi.fn(), waitForDiscovery: vi.fn() }))
 
 vi.mock('../../services/onboardingService', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../services/onboardingService')>()
   return { ...original, getOnboarding, saveOnboarding, analyzeGoal }
 })
 vi.mock('../../services/roadmapService', () => ({ createRoadmap }))
+vi.mock('../../services/resourceService', () => ({ discoverResources, waitForDiscovery }))
 
 import OnboardingWizard from './OnboardingWizard'
 
@@ -60,6 +62,8 @@ describe('OnboardingWizard', () => {
       completed_steps: update.completed_steps,
       draft: update.draft,
     }))
+    discoverResources.mockResolvedValue({ id: 'job-1', status: 'queued', progress: 0 })
+    waitForDiscovery.mockResolvedValue({ id: 'job-1', status: 'completed', progress: 100 })
   })
 
   it('resumes a saved goal draft from the server', async () => {

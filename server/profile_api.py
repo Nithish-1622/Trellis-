@@ -17,6 +17,7 @@ from profile_schemas import (
 from profile_service import LearnerProfileService
 from goal_analyzer import GoalAnalyzer, get_goal_analyzer
 from rate_limit import SlidingWindowRateLimiter, get_expensive_operation_limiter
+from resource_jobs import ResourceJobService
 
 
 router = APIRouter(prefix="/v1/me", tags=["learner profile"])
@@ -47,7 +48,12 @@ def save_onboarding(
     identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> OnboardingSessionResponse:
-    return LearnerProfileService(db).save_onboarding(identity, update)
+    service = LearnerProfileService(db)
+    session = service.save_onboarding(identity, update)
+    if update.complete:
+        profile = service.ensure_profile(identity)
+        ResourceJobService(db).enqueue_discovery(identity.user_id, profile.profile_version)
+    return session
 
 
 @router.get("/profile", response_model=LearnerProfileResponse)
