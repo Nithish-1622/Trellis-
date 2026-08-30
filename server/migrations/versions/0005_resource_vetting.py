@@ -52,14 +52,23 @@ def upgrade() -> None:
 
     connection = op.get_bind()
     resources = connection.execute(sa.text(
-        "SELECT id, provider, external_id, url FROM learning_resources"
+        "SELECT id, provider, external_id, url FROM learning_resources ORDER BY id"
     )).mappings()
+    canonical_keys: set[str] = set()
     for resource in resources:
+        canonical_key = _canonical_key(resource["provider"], resource["external_id"], resource["url"], resource["id"])
+        duplicate = canonical_key in canonical_keys
+        canonical_keys.add(canonical_key)
+        if duplicate:
+            canonical_key = f"{canonical_key}:legacy-duplicate:{resource['id']}"
         connection.execute(
-            sa.text("UPDATE learning_resources SET canonical_key=:canonical_key WHERE id=:id"),
-            {"id": resource["id"], "canonical_key": _canonical_key(
-                resource["provider"], resource["external_id"], resource["url"], resource["id"]
-            )},
+            sa.text("""
+                UPDATE learning_resources
+                SET canonical_key=:canonical_key,
+                    archived_at=CASE WHEN :duplicate THEN COALESCE(archived_at, CURRENT_TIMESTAMP) ELSE archived_at END
+                WHERE id=:id
+            """),
+            {"id": resource["id"], "canonical_key": canonical_key, "duplicate": duplicate},
         )
     connection.execute(sa.text(
         "UPDATE learning_resources SET verification_status='discovered' WHERE verification_status='pending'"
@@ -209,6 +218,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.get_bind().execute(sa.text(
+        "UPDATE learning_resources SET verification_status='pending' WHERE verification_status IN ('discovered', 'vetted', 'rejected')"
+    ))
     op.drop_index("ix_resource_moderation_resource_time", table_name="resource_moderation_actions")
     op.drop_table("resource_moderation_actions")
     op.drop_table("resource_signal_summaries")
