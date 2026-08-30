@@ -77,6 +77,14 @@ class ResourceJobService:
 
     def claim_next(self, worker_id: str) -> ResourceJob | None:
         now = datetime.utcnow()
+        stale_before = now - timedelta(seconds=settings.RESOURCE_JOB_LOCK_TIMEOUT_SECONDS)
+        self.db.query(ResourceJob).filter(
+            ResourceJob.status == "running", ResourceJob.locked_at < stale_before,
+        ).update({
+            ResourceJob.status: "queued", ResourceJob.locked_at: None,
+            ResourceJob.locked_by: None, ResourceJob.run_at: now,
+            ResourceJob.last_error_code: "WORKER_LEASE_EXPIRED", ResourceJob.updated_at: now,
+        }, synchronize_session=False)
         job = self.db.query(ResourceJob).filter(
             ResourceJob.status == "queued", ResourceJob.run_at <= now,
         ).order_by(ResourceJob.run_at, ResourceJob.created_at).with_for_update(skip_locked=True).first()
@@ -170,9 +178,15 @@ class ResourceDiscoveryService:
         GoalSkillService(self.db).persist(profile)
         gaps = ResourceCoverageService(self.db).uncovered(job.user_id, version)
         total = max(min(len(gaps), settings.RESOURCE_DISCOVERY_SKILL_LIMIT), 1)
-        discovered = vetted = rejected = 0
-        failed_skills: list[str] = []
+        checkpoint = dict(job.result or {})
+        processed_skill_ids = set(checkpoint.get("processed_skill_ids") or [])
+        discovered = int(checkpoint.get("discovered", 0))
+        vetted = int(checkpoint.get("vetted", 0))
+        rejected = int(checkpoint.get("rejected", 0))
+        failed_skills: list[str] = list(checkpoint.get("provider_gaps") or [])
         for index, gap in enumerate(gaps[:settings.RESOURCE_DISCOVERY_SKILL_LIMIT], start=1):
+            if gap.goal_skill_id in processed_skill_ids:
+                continue
             requirement = self.db.get(LearnerGoalSkill, gap.goal_skill_id)
             if requirement is None:
                 continue
@@ -209,6 +223,13 @@ class ResourceDiscoveryService:
                 else:
                     discovered += 1
             job.progress = min(round(index / total * 100), 99)
+            processed_skill_ids.add(gap.goal_skill_id)
+            job.result = {
+                "processed_skill_ids": sorted(processed_skill_ids), "discovered": discovered,
+                "vetted": vetted, "rejected": rejected,
+                "provider_gaps": list(dict.fromkeys(failed_skills)),
+            }
+            job.locked_at = datetime.utcnow()
             job.updated_at = datetime.utcnow()
             self.db.commit()
 

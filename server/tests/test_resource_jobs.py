@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -78,6 +78,20 @@ def test_failed_jobs_retry_with_a_bound_and_remain_inspectable(job_db):
 
     assert job.status == "dead"
     assert job.last_error_code == "PROVIDER_TIMEOUT"
+
+
+def test_stale_worker_lease_is_reclaimed_but_fresh_lease_is_not(job_db):
+    db, profile = job_db
+    service = ResourceJobService(db)
+    job = service.enqueue_discovery(profile.user_id, profile.profile_version)
+    service.claim_next("dead-worker")
+    job.locked_at = datetime.utcnow() - timedelta(seconds=301)
+    db.commit()
+
+    reclaimed = service.claim_next("replacement-worker")
+    assert reclaimed.id == job.id
+    assert reclaimed.locked_by == "replacement-worker"
+    assert service.claim_next("other-worker") is None
 
 
 def test_recurring_maintenance_is_deduplicated(job_db):
