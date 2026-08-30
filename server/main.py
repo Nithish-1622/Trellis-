@@ -40,6 +40,7 @@ from profile_api import router as profile_router
 from learning_history_api import router as learning_history_router
 from catalog_api import admin_router as catalog_admin_router, learner_router as catalog_learner_router
 from roadmap_api import router as roadmap_router
+from assessment_api import router as assessment_router
 from typing import Annotated
 
 # Configure logging
@@ -63,6 +64,7 @@ app.include_router(learning_history_router)
 app.include_router(catalog_learner_router)
 app.include_router(catalog_admin_router)
 app.include_router(roadmap_router)
+app.include_router(assessment_router)
 
 # CORS middleware
 app.add_middleware(

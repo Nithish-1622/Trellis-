@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # Groq (Main LLM)
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    ENABLE_AI_PROJECT_GRADING: bool = False
     
     # JSearch API (RapidAPI)
     JSEARCH_API_KEY: str = ""
