@@ -7,7 +7,7 @@ import logging
 import uuid
 
 from config import settings
-from database import init_db, get_db, UserProfile
+from database import get_db, UserProfile
 from schemas import (
     AgentMessageRequest, AgentMessageResponse,
     RoadmapRegenerateRequest,
@@ -35,6 +35,7 @@ from learning_resources import learning_resources
 from interview_agent import get_interview_agent
 from auth import AuthenticatedUser, get_current_user
 from errors import register_error_handlers
+from migration_runner import run_migrations
 from typing import Annotated
 
 # Configure logging
@@ -69,7 +70,7 @@ app.add_middleware(
 async def startup_event():
     """Initialize database on startup."""
     logger.info("Starting Career Mentor API...")
-    init_db()
+    run_migrations()
     logger.info("Database initialized")
 
 
