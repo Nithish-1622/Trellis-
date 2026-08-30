@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "0004_personalized_learning_domain"
+revision: str = "0004_learning_domain"
 down_revision: str | None = "0003_verified_resource_catalog"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

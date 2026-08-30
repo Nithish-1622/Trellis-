@@ -2,7 +2,20 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
+
+
+def test_alembic_revision_ids_fit_version_table_column():
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    revisions = ScriptDirectory.from_config(config).walk_revisions()
+    oversized_revisions = {
+        revision.revision: len(revision.revision)
+        for revision in revisions
+        if len(revision.revision) > 32
+    }
+
+    assert oversized_revisions == {}
 
 
 def test_alembic_baseline_upgrades_and_downgrades_clean_database(tmp_path):
