@@ -9,6 +9,8 @@ from sqlalchemy.pool import StaticPool
 from auth import AuthenticatedUser, get_current_user
 from database import Base, LearnerSkill, get_db
 from main import app
+from goal_analyzer import get_goal_analyzer
+from profile_schemas import GoalAnalysisResponse
 
 
 @pytest.fixture
@@ -149,3 +151,27 @@ def test_onboarding_rejects_invalid_availability_with_error_envelope(onboarding_
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_goal_analysis_returns_an_editable_structured_proposal(onboarding_client):
+    client, _db, _identity = onboarding_client
+
+    class StubGoalAnalyzer:
+        async def analyze(self, goal: str) -> GoalAnalysisResponse:
+            assert "backend engineer" in goal
+            return GoalAnalysisResponse(
+                target_role="Backend Engineer",
+                objective="Build and deploy reliable services",
+                target_date=None,
+                explanation="The role and outcome were stated directly.",
+            )
+
+    app.dependency_overrides[get_goal_analyzer] = lambda: StubGoalAnalyzer()
+    response = client.post(
+        "/v1/me/onboarding/goal-analysis",
+        json={"goal": "I want to become a backend engineer within a year."},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["target_role"] == "Backend Engineer"
+    assert response.json()["objective"] == "Build and deploy reliable services"

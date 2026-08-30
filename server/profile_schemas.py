@@ -21,6 +21,17 @@ class GoalDraft(BaseModel):
     target_date: date | None = None
 
 
+class GoalAnalysisRequest(BaseModel):
+    goal: str = Field(min_length=10, max_length=2000)
+
+
+class GoalAnalysisResponse(BaseModel):
+    target_role: str = Field(min_length=1, max_length=200)
+    objective: str = Field(min_length=1, max_length=1000)
+    target_date: date | None = None
+    explanation: str = Field(min_length=1, max_length=1000)
+
+
 class SkillDraft(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     proficiency: str = Field(pattern="^(beginner|intermediate|advanced|expert)$")

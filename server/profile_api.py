@@ -8,14 +8,26 @@ from sqlalchemy.orm import Session
 from auth import AuthenticatedUser, get_current_user
 from database import get_db
 from profile_schemas import (
+    GoalAnalysisRequest,
+    GoalAnalysisResponse,
     LearnerProfileResponse,
     OnboardingSessionResponse,
     OnboardingUpdate,
 )
 from profile_service import LearnerProfileService
+from goal_analyzer import GoalAnalyzer, get_goal_analyzer
 
 
 router = APIRouter(prefix="/v1/me", tags=["learner profile"])
+
+
+@router.post("/onboarding/goal-analysis", response_model=GoalAnalysisResponse)
+async def analyze_onboarding_goal(
+    request: GoalAnalysisRequest,
+    _identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    analyzer: Annotated[GoalAnalyzer, Depends(get_goal_analyzer)],
+) -> GoalAnalysisResponse:
+    return await analyzer.analyze(request.goal)
 
 
 @router.get("/onboarding", response_model=OnboardingSessionResponse)
