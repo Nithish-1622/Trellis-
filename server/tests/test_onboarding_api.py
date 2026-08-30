@@ -143,6 +143,20 @@ def test_onboarding_completion_is_idempotent_and_persists_normalized_profile(onb
     assert db.query(ResourceJob).filter_by(job_type="discovery").count() == 1
 
 
+def test_onboarding_remains_complete_when_discovery_enqueue_fails(onboarding_client, monkeypatch):
+    client, db, _identity = onboarding_client
+
+    def fail_enqueue(*_args, **_kwargs):
+        raise RuntimeError("worker database unavailable")
+
+    monkeypatch.setattr("profile_api.ResourceJobService.enqueue_discovery", fail_enqueue)
+    response = client.post("/v1/me/onboarding", json=onboarding_payload(complete=True))
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert db.get(UserProfile, "learner-one").onboarding_completed_at is not None
+
+
 def test_confirmed_resume_capabilities_persist_once_with_provenance(onboarding_client):
     client, db, _identity = onboarding_client
     payload = onboarding_payload(complete=True)

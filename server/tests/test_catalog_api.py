@@ -167,7 +167,7 @@ def test_admin_can_bulk_import_and_preview_but_manual_provider_sync_is_removed(c
 
     class StubProvider:
         async def search(self, query: str, limit: int):
-            return [ExternalResource(provider="github", external_id="123", resource_type="project", title="example/backend-project", url="https://github.com/example/backend-project", topics=["APIs"])]
+                return [ExternalResource(provider="github", external_id="example/backend-project", resource_type="project", title="example/backend-project", url="https://github.com/example/backend-project", topics=["APIs"])]
 
     app.dependency_overrides[get_hybrid_resource_provider] = lambda: StubProvider()
     preview = client.get("/v1/admin/resources/provider-preview?query=backend%20APIs&limit=5")

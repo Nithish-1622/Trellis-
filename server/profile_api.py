@@ -1,5 +1,6 @@
 """Authenticated learner profile and onboarding routes."""
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -21,6 +22,7 @@ from resource_jobs import ResourceJobService
 
 
 router = APIRouter(prefix="/v1/me", tags=["learner profile"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/onboarding/goal-analysis", response_model=GoalAnalysisResponse)
@@ -52,7 +54,11 @@ def save_onboarding(
     session = service.save_onboarding(identity, update)
     if update.complete:
         profile = service.ensure_profile(identity)
-        ResourceJobService(db).enqueue_discovery(identity.user_id, profile.profile_version)
+        try:
+            ResourceJobService(db).enqueue_discovery(identity.user_id, profile.profile_version)
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Unable to enqueue onboarding resource discovery: %s", type(exc).__name__)
     return session
 
 

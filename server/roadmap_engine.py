@@ -26,6 +26,7 @@ from database import (
 from config import settings
 from errors import APIError
 from profile_service import LearnerProfileService
+from resource_policy import INELIGIBLE_LINK_STATUSES
 from roadmap_schemas import (
     MilestoneCompletion,
     MilestoneProgressUpdate,
@@ -205,7 +206,7 @@ class RoadmapService:
         canonical = canonical_skill_name(skill_name)
         resources = self.db.query(LearningResource).filter(
             LearningResource.archived_at.is_(None), LearningResource.suppressed_at.is_(None),
-            LearningResource.link_status.notin_(["broken", "unsafe"]),
+            LearningResource.link_status.notin_(INELIGIBLE_LINK_STATUSES),
             or_(
                 LearningResource.verification_status == "verified",
                 and_(

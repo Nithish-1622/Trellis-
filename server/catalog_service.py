@@ -24,6 +24,7 @@ from database import LearningHistory, LearningResource, ResourceEvaluation, Reso
 from errors import APIError
 from profile_service import LearnerProfileService
 from resource_providers import canonical_resource_key
+from resource_policy import INELIGIBLE_LINK_STATUSES
 
 
 def _terms(values: list[str]) -> set[str]:
@@ -141,7 +142,7 @@ class CatalogService:
         query = self.db.query(LearningResource).filter(
             LearningResource.archived_at.is_(None),
             LearningResource.suppressed_at.is_(None),
-            LearningResource.link_status.notin_(["broken", "unsafe"]),
+            LearningResource.link_status.notin_(INELIGIBLE_LINK_STATUSES),
             or_(
                 LearningResource.verification_status == "verified",
                 and_(

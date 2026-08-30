@@ -30,6 +30,7 @@ from database import (
 from errors import APIError
 from profile_service import LearnerProfileService
 from resource_jobs import ResourceJobService
+from resource_policy import INELIGIBLE_LINK_STATUSES
 
 
 _SUMMARY_FIELD = {
@@ -51,7 +52,7 @@ class ResourceFeedbackService:
             LearningResource.id == resource_id,
             LearningResource.archived_at.is_(None),
             LearningResource.suppressed_at.is_(None),
-            LearningResource.link_status.notin_(["broken", "unsafe"]),
+            LearningResource.link_status.notin_(INELIGIBLE_LINK_STATUSES),
             or_(
                 LearningResource.verification_status == "verified",
                 and_(

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import LearnerGoalSkill, LearningResource, ResourceSkillMap, Skill
+from resource_policy import INELIGIBLE_LINK_STATUSES
 
 
 PRACTICAL_TYPES = {"project", "exercise", "assessment"}
@@ -42,7 +43,7 @@ class ResourceCoverageService:
                 ResourceSkillMap.relevance_score >= 75,
                 LearningResource.archived_at.is_(None),
                 LearningResource.suppressed_at.is_(None),
-                LearningResource.link_status.notin_(["broken", "unsafe"]),
+                LearningResource.link_status.notin_(INELIGIBLE_LINK_STATUSES),
                 or_(
                     LearningResource.verification_status == "verified",
                     and_(
