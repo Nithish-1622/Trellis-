@@ -19,6 +19,7 @@ from database import (
     UserRole,
 )
 from errors import APIError
+from goal_skill_planner import GoalSkillService
 from profile_schemas import (
     LearnerProfileResponse,
     LearnerSkillResponse,
@@ -109,6 +110,8 @@ class LearnerProfileService:
             .first()
         )
         now = datetime.utcnow()
+        was_completed = session is not None and session.status == "completed"
+        previous_draft = session.draft if session is not None else None
         if session is None:
             session = OnboardingSession(
                 id=str(uuid.uuid4()),
@@ -124,7 +127,9 @@ class LearnerProfileService:
 
         if update.complete:
             self._validate_completion(update.draft)
-            self._persist_completed_profile(identity, update.draft)
+            incoming_draft = update.draft.model_dump(mode="json")
+            if not was_completed or previous_draft != incoming_draft:
+                self._persist_completed_profile(identity, update.draft)
             session.status = "completed"
             session.completed_at = session.completed_at or now
             session.current_step = OnboardingStep.REVIEW.value
@@ -207,6 +212,7 @@ class LearnerProfileService:
         if draft.previous_learning:
             for course in draft.previous_learning.courses:
                 self._upsert_history(profile.user_id, course.model_dump())
+        GoalSkillService(self.db).persist(profile)
 
     def _upsert_skill(self, user_id: str, skill_draft) -> Skill:
         skill = self._resolve_skill(skill_draft.name)

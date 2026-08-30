@@ -259,6 +259,8 @@ class LearnerGoalSkill(Base):
     confidence = Column(Float, nullable=False, default=0.5)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
+    skill = relationship("Skill")
+
 
 class ResourceSkillMap(Base):
     """Searchable relevance between an indexed resource and canonical skill."""
