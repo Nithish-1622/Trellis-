@@ -60,7 +60,7 @@ class ResourceFeedbackService:
                     LearningResource.score_confidence >= settings.RESOURCE_MIN_CONFIDENCE,
                 ),
             ),
-        ).first()
+        ).with_for_update().first()
         if resource is None:
             raise APIError(status_code=404, code="RESOURCE_NOT_FOUND", message="Learning resource was not found")
         if payload.milestone_id:
@@ -77,6 +77,9 @@ class ResourceFeedbackService:
         if existing:
             if existing.resource_id != resource_id or existing.event_type != payload.event_type:
                 raise APIError(status_code=409, code="IDEMPOTENCY_KEY_REUSED", message="The idempotency key was already used for a different interaction")
+            if payload.event_type == "report":
+                ResourceJobService(self.db).enqueue_evaluation(resource_id, "learner_report", commit=False)
+                self.db.commit()
             return self._response(existing, False)
         event = ResourceInteraction(
             id=str(uuid.uuid4()), resource_id=resource_id, user_id=identity.user_id,
@@ -94,6 +97,8 @@ class ResourceFeedbackService:
         field = _SUMMARY_FIELD[payload.event_type]
         setattr(summary, field, (getattr(summary, field) or 0) + 1)
         summary.updated_at = datetime.utcnow()
+        if payload.event_type == "report":
+            ResourceJobService(self.db).enqueue_evaluation(resource_id, "learner_report", commit=False)
         try:
             self.db.commit()
         except IntegrityError:
@@ -102,8 +107,6 @@ class ResourceFeedbackService:
                 user_id=identity.user_id, idempotency_key=payload.idempotency_key,
             ).one()
             return self._response(existing, False)
-        if payload.event_type == "report":
-            ResourceJobService(self.db).enqueue_evaluation(resource_id, "learner_report")
         self.db.refresh(event)
         return self._response(event, True)
 

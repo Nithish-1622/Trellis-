@@ -59,7 +59,7 @@ class ResourceJobService:
         self.db.refresh(job)
         return job
 
-    def enqueue_evaluation(self, resource_id: str, reason: str) -> ResourceJob:
+    def enqueue_evaluation(self, resource_id: str, reason: str, *, commit: bool = True) -> ResourceJob:
         bucket = datetime.utcnow().strftime("%Y-%m-%d")
         dedupe_key = f"{resource_id}:evaluation:{bucket}"
         existing = self.db.query(ResourceJob).filter_by(job_type="evaluation", dedupe_key=dedupe_key).first()
@@ -70,9 +70,15 @@ class ResourceJobService:
             payload={"resource_id": resource_id, "reason": reason[:100]}, result={}, progress=0,
             attempts=0, max_attempts=settings.RESOURCE_JOB_MAX_ATTEMPTS, run_at=datetime.utcnow(),
         )
-        self.db.add(job)
-        self.db.commit()
-        self.db.refresh(job)
+        try:
+            with self.db.begin_nested():
+                self.db.add(job)
+                self.db.flush()
+        except IntegrityError:
+            job = self.db.query(ResourceJob).filter_by(job_type="evaluation", dedupe_key=dedupe_key).one()
+        if commit:
+            self.db.commit()
+            self.db.refresh(job)
         return job
 
     def claim_next(self, worker_id: str) -> ResourceJob | None:

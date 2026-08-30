@@ -231,6 +231,11 @@ def test_learner_feedback_is_idempotent_aggregated_and_reports_enqueue_reevaluat
     assert summary.helpful == 1
     assert summary.reports == 1
     assert db.query(ResourceJob).filter_by(job_type="evaluation").count() == 1
+    db.query(ResourceJob).filter_by(job_type="evaluation").delete()
+    db.commit()
+    replay = client.post(f"/v1/resources/{resource_id}/interactions", json={"event_type": "report", "idempotency_key": "feedback-report-1", "report_reason": "The material appears outdated."})
+    assert replay.status_code == 200
+    assert db.query(ResourceJob).filter_by(job_type="evaluation").count() == 1
     identity["user"] = AuthenticatedUser(user_id="admin-user", email="admin@example.com", name="Admin", roles=["learner", "admin"])
     exceptions = client.get("/v1/admin/resources?exception_category=reports")
     assert exceptions.status_code == 200
