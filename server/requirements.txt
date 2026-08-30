@@ -35,7 +35,7 @@ h11
 httptools
 websockets
 watchfiles
-uvloop
+uvloopuvloop; sys_platform != "win32"
 
 # Serialization & Performance
 orjson
