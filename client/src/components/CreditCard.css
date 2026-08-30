@@ -1,0 +1,142 @@
+/* ---- CreditCard.css ---- */
+.card-perspective-container {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  display: inline-block;
+}
+
+.interactive-3d-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  height: 220px;
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Themes */
+.card-theme-emerald {
+  background: linear-gradient(135deg, #064e3b 0%, #047857 45%, #0f172a 100%);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  box-shadow: 0 20px 35px -10px rgba(6, 78, 59, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.card-theme-obsidian {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #020617 100%);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+
+.card-theme-gold {
+  background: linear-gradient(135deg, #78350f 0%, #d97706 40%, #451a03 100%);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  box-shadow: 0 20px 35px -10px rgba(217, 119, 6, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+}
+
+.card-theme-violet {
+  background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 45%, #1e1b4b 100%);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  box-shadow: 0 20px 35px -10px rgba(124, 58, 237, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+/* Holographic Glare Overlay */
+.card-glare-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--glare-x, 50%) var(--glare-y, 50%),
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.08) 40%,
+    transparent 70%
+  );
+  mix-blend-mode: overlay;
+  opacity: var(--glare-opacity, 0);
+  transition: opacity 0.2s ease;
+  z-index: 5;
+}
+
+/* Holographic Shimmer Foil */
+.card-shimmer-foil {
+  position: absolute;
+  inset: -100%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 30%,
+    rgba(52, 211, 153, 0.15) 45%,
+    rgba(251, 191, 36, 0.15) 55%,
+    rgba(167, 139, 250, 0.15) 65%,
+    transparent 80%
+  );
+  transform: translate(var(--shimmer-x, -50%), var(--shimmer-y, -50%));
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  opacity: 0.6;
+  z-index: 4;
+}
+
+/* 3D Floating Layers */
+.card-layer-bg {
+  transform: translateZ(0px);
+}
+
+.card-layer-chip {
+  transform: translateZ(28px);
+}
+
+.card-layer-text {
+  transform: translateZ(35px);
+}
+
+.card-layer-badge {
+  transform: translateZ(42px);
+}
+
+/* Metallic EMV Chip */
+.metallic-chip {
+  width: 44px;
+  height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #fbbf24 0%, #d97706 40%, #fef3c7 70%, #b45309 100%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.metallic-chip::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(180, 83, 9, 0.7);
+  border-radius: 3px;
+}
+
+.metallic-chip::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(180, 83, 9, 0.7);
+}
+
+/* Embossed Card Numbers */
+.embossed-number {
+  font-family: 'Geist Mono', monospace, ui-monospace;
+  letter-spacing: 0.15em;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 -1px 1px rgba(255, 255, 255, 0.2);
+}
+

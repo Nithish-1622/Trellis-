@@ -1,0 +1,191 @@
+/* ---- Hero21.css ---- */
+.hero21-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 2.5rem;
+  padding: 3rem 1.5rem;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .hero21-container {
+    padding: 4rem 3rem;
+  }
+}
+
+/* GLSL Aurora Mesh Background */
+.hero21-aurora-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.hero21-aurora-wave {
+  position: absolute;
+  filter: blur(60px);
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  animation: auroraFlow 18s ease-in-out infinite alternate;
+  border-radius: 50%;
+}
+
+.dark .hero21-aurora-wave {
+  opacity: 0.35;
+  mix-blend-mode: screen;
+}
+
+.hero21-wave-1 {
+  top: -20%;
+  left: 10%;
+  width: 550px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.45) 0%, rgba(5, 150, 105, 0.2) 60%, transparent 80%);
+}
+
+.hero21-wave-2 {
+  bottom: -15%;
+  right: 5%;
+  width: 500px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.35) 0%, rgba(245, 158, 11, 0.15) 50%, transparent 80%);
+  animation-delay: -5s;
+}
+
+.hero21-wave-3 {
+  top: 30%;
+  right: 25%;
+  width: 400px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(6, 78, 59, 0.4) 0%, rgba(16, 185, 129, 0.15) 60%, transparent 80%);
+  animation-delay: -9s;
+}
+
+@keyframes auroraFlow {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate(40px, -30px) scale(1.12) rotate(15deg);
+  }
+  100% {
+    transform: translate(-30px, 40px) scale(0.95) rotate(-15deg);
+  }
+}
+
+/* Luminous Orb Mark */
+.hero21-orb-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 35%, #6ee7b7 0%, #10b981 40%, #047857 85%);
+  box-shadow:
+    0 0 25px rgba(16, 185, 129, 0.55),
+    0 0 50px rgba(16, 185, 129, 0.25),
+    inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  animation: orbPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes orbPulse {
+  0% {
+    transform: scale(0.96);
+    box-shadow:
+      0 0 20px rgba(16, 185, 129, 0.45),
+      0 0 40px rgba(16, 185, 129, 0.15),
+      inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  }
+  100% {
+    transform: scale(1.04);
+    box-shadow:
+      0 0 35px rgba(16, 185, 129, 0.75),
+      0 0 65px rgba(16, 185, 129, 0.35),
+      inset 0 2px 4px rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Ambient Action Labels */
+.ambient-action-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #334155;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.dark .ambient-action-label {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.ambient-action-label:hover {
+  transform: translateY(-2px);
+  border-color: #10b981;
+  color: #047857;
+}
+
+.dark .ambient-action-label:hover {
+  border-color: #34d399;
+  color: #6ee7b7;
+}
+
+/* Luminous Action Button */
+.luminous-cta-btn {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  padding: 0.875rem 1.75rem;
+  border-radius: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow:
+    0 10px 25px -5px rgba(5, 150, 105, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.dark .luminous-cta-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #090d11;
+  box-shadow:
+    0 10px 25px -5px rgba(16, 185, 129, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+}
+
+.luminous-cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 15px 30px -5px rgba(16, 185, 129, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+}
+
+.luminous-cta-btn:active {
+  transform: translateY(0);
+}
+

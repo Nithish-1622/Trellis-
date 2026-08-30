@@ -1,0 +1,72 @@
+/* ---- SocialProof15.css ---- */
+.socialproof15-container {
+  position: relative;
+  width: 100%;
+  border-radius: 2rem;
+  padding: 2.5rem 1.5rem;
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 768px) {
+  .socialproof15-container {
+    padding: 3.5rem 3rem;
+  }
+}
+
+.dark .socialproof15-container {
+  background-color: #0f172a;
+  border: 1px solid rgba(30, 41, 59, 0.85);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Author Card in Rail */
+.author-rail-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  text-align: left;
+}
+
+.author-rail-btn:hover {
+  background-color: rgba(241, 245, 249, 0.7);
+}
+
+.dark .author-rail-btn:hover {
+  background-color: rgba(30, 41, 59, 0.5);
+}
+
+.author-rail-btn.active {
+  background-color: rgba(240, 253, 244, 0.9);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+}
+
+.dark .author-rail-btn.active {
+  background-color: rgba(6, 78, 59, 0.3);
+  border-color: rgba(52, 211, 153, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.author-progress-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2.5px;
+  background: #10b981;
+}
+
+.dark .author-progress-line {
+  background: #34d399;
+}
+

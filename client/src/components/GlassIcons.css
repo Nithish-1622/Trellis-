@@ -1,0 +1,125 @@
+/* ---- GlassIcons.css ---- */
+.icon-btns {
+  display: grid;
+  grid-gap: 2.5rem;
+  grid-template-columns: repeat(2, 1fr);
+  margin: auto;
+  padding: 1.5rem 0;
+  overflow: visible;
+  justify-items: center;
+}
+
+@media (min-width: 640px) {
+  .icon-btns {
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .icon-btns {
+    grid-template-columns: repeat(6, 1fr);
+    grid-gap: 2rem;
+  }
+}
+
+.icon-btn {
+  background-color: transparent;
+  outline: none;
+  position: relative;
+  width: 4.5em;
+  height: 4.5em;
+  perspective: 24em;
+  transform-style: preserve-3d;
+  -webkit-tap-highlight-color: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.icon-btn__back,
+.icon-btn__front,
+.icon-btn__label {
+  transition:
+    opacity 0.3s cubic-bezier(0.83, 0, 0.17, 1),
+    transform 0.3s cubic-bezier(0.83, 0, 0.17, 1);
+}
+
+.icon-btn__back,
+.icon-btn__front {
+  border-radius: 1.25em;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.icon-btn__back {
+  box-shadow: 0.5em -0.5em 0.75em hsla(223, 10%, 10%, 0.15);
+  display: block;
+  transform: rotate(15deg);
+  transform-origin: 100% 100%;
+  will-change: transform;
+}
+
+.icon-btn__front {
+  background-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 0 0.1em rgba(255, 255, 255, 0.4) inset;
+  backdrop-filter: blur(0.75em);
+  -webkit-backdrop-filter: blur(0.75em);
+  -moz-backdrop-filter: blur(0.75em);
+  display: flex;
+  transform-origin: 80% 50%;
+  will-change: transform;
+}
+
+.dark .icon-btn__front {
+  background-color: rgba(15, 23, 42, 0.4);
+  box-shadow: 0 0 0 0.1em rgba(255, 255, 255, 0.2) inset;
+}
+
+.icon-btn__icon {
+  margin: auto;
+  width: 1.6em;
+  height: 1.6em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.icon-btn__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.5;
+  opacity: 0.85;
+  position: absolute;
+  top: 110%;
+  right: -2rem;
+  left: -2rem;
+  transform: translateY(0);
+  color: #0f172a;
+}
+
+.dark .icon-btn__label {
+  color: #f8fafc;
+}
+
+.icon-btn:focus-visible .icon-btn__back,
+.icon-btn:hover .icon-btn__back {
+  transform: rotate(25deg) translate3d(-0.5em, -0.5em, 0.5em);
+}
+
+.icon-btn:focus-visible .icon-btn__front,
+.icon-btn:hover .icon-btn__front {
+  transform: translate3d(0, 0, 2em);
+}
+
+.icon-btn:focus-visible .icon-btn__label,
+.icon-btn:hover .icon-btn__label {
+  opacity: 1;
+  transform: translateY(15%);
+}
+

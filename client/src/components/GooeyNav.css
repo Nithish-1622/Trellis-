@@ -1,0 +1,85 @@
+/* ---- GooeyNav.css ---- */
+.gooey-nav-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.gooey-nav-container nav {
+  display: flex;
+  position: relative;
+}
+
+.gooey-nav-container nav ul {
+  display: flex;
+  gap: 0.25rem;
+  list-style: none;
+  padding: 0.3rem;
+  margin: 0;
+  position: relative;
+  z-index: 3;
+  color: #475569;
+  border-radius: 9999px;
+  background-color: #f1f5f9;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) inset;
+}
+
+.dark .gooey-nav-container nav ul {
+  color: #94a3b8;
+  background-color: #0f172a;
+  border: 1px solid rgba(30, 41, 59, 0.85);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) inset;
+}
+
+.gooey-nav-container nav ul li {
+  border-radius: 9999px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gooey-nav-container nav ul li button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.dark .gooey-nav-container nav ul li button {
+  color: #94a3b8;
+}
+
+.gooey-nav-container nav ul li:hover button {
+  color: #0f172a;
+}
+
+.dark .gooey-nav-container nav ul li:hover button {
+  color: #ffffff;
+}
+
+/* Active State in Light Mode */
+.gooey-nav-container nav ul li.active button {
+  background-color: #059669;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+/* Active State in Dark Mode */
+.dark .gooey-nav-container nav ul li.active button {
+  background-color: #10b981;
+  color: #090d11;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+}

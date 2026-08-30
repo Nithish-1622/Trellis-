@@ -1,0 +1,107 @@
+/* ---- ResumeDropper.css ---- */
+.resume-dropper-container {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.resume-drop-zone {
+  position: relative;
+  border-radius: 1.5rem;
+  border: 2px dashed rgba(203, 213, 225, 0.8);
+  background: rgba(248, 250, 252, 0.6);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.dark .resume-drop-zone {
+  border-color: rgba(51, 65, 85, 0.8);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.resume-drop-zone:hover {
+  border-color: #10b981;
+  background: rgba(236, 253, 245, 0.5);
+  transform: translateY(-2px);
+}
+
+.dark .resume-drop-zone:hover {
+  border-color: #10b981;
+  background: rgba(6, 78, 59, 0.15);
+}
+
+.resume-drop-zone.drag-active {
+  border-color: #059669;
+  background: rgba(209, 250, 229, 0.7);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.25);
+  transform: scale(1.01);
+}
+
+.dark .resume-drop-zone.drag-active {
+  border-color: #34d399;
+  background: rgba(6, 78, 59, 0.35);
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.35);
+}
+
+/* Upload Icon Pulse */
+.resume-upload-icon-pulse {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1.25rem;
+  background: #ecfdf5;
+  color: #059669;
+  margin-bottom: 1.25rem;
+  transition: transform 0.2s ease;
+}
+
+.dark .resume-upload-icon-pulse {
+  background: rgba(6, 78, 59, 0.4);
+  color: #34d399;
+}
+
+.resume-drop-zone:hover .resume-upload-icon-pulse {
+  transform: scale(1.08) rotate(-3deg);
+}
+
+/* Parsing State */
+.resume-parsing-card {
+  border-radius: 1.5rem;
+  padding: 2rem;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+.dark .resume-parsing-card {
+  background: #0f172a;
+  border-color: rgba(30, 41, 59, 0.85);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Extracted Skill Chip */
+.extracted-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(236, 253, 245, 0.8);
+  color: #065f46;
+  border: 1px solid rgba(167, 243, 208, 0.8);
+}
+
+.dark .extracted-skill-chip {
+  background: rgba(6, 78, 59, 0.35);
+  color: #a7f3d0;
+  border-color: rgba(4, 120, 87, 0.5);
+}
+

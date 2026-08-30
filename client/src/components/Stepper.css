@@ -1,0 +1,208 @@
+/* ---- Stepper.css ---- */
+.outer-container {
+  display: flex;
+  min-height: 100%;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-circle-container {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  border-radius: 1.75rem;
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.05),
+    0 10px 10px -5px rgba(0, 0, 0, 0.02);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.dark .step-circle-container {
+  background-color: #0f172a;
+  border: 1px solid rgba(30, 41, 59, 0.8);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.4),
+    0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+.step-indicator-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 1.5rem 2rem 1rem;
+}
+
+.step-content-default {
+  position: relative;
+  overflow: hidden;
+}
+
+.step-default {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-bottom: 0.5rem;
+}
+
+.footer-container {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-bottom: 1.75rem;
+}
+
+.footer-nav {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(241, 245, 249, 0.9);
+  display: flex;
+  align-items: center;
+}
+
+.dark .footer-nav {
+  border-top: 1px solid rgba(30, 41, 59, 0.7);
+}
+
+.footer-nav.spread {
+  justify-content: space-between;
+}
+
+.footer-nav.end {
+  justify-content: flex-end;
+}
+
+.back-button {
+  transition: all 250ms ease;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background-color: transparent;
+  cursor: pointer;
+}
+
+.dark .back-button {
+  color: #94a3b8;
+  border: 1px solid rgba(51, 65, 85, 0.8);
+}
+
+.back-button:hover {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+.dark .back-button:hover {
+  color: #f8fafc;
+  background-color: #1e293b;
+}
+
+.back-button.inactive {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.next-button {
+  transition: all 250ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 0.75rem;
+  background-color: #059669;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  padding: 0.55rem 1.25rem;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+}
+
+.dark .next-button {
+  background-color: #10b981;
+  color: #090d11;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.next-button:hover {
+  background-color: #047857;
+  transform: translateY(-1px);
+}
+
+.dark .next-button:hover {
+  background-color: #34d399;
+}
+
+.next-button:active {
+  transform: translateY(0);
+}
+
+.step-indicator {
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.step-indicator-inner {
+  display: flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.active-dot {
+  height: 0.65rem;
+  width: 0.65rem;
+  border-radius: 9999px;
+  background-color: #ffffff;
+}
+
+.dark .active-dot {
+  background-color: #090d11;
+}
+
+.step-number {
+  font-size: 0.8125rem;
+}
+
+.step-connector {
+  position: relative;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  height: 0.175rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background-color: rgba(226, 232, 240, 0.9);
+}
+
+.dark .step-connector {
+  background-color: rgba(51, 65, 85, 0.8);
+}
+
+.step-connector-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+}
+
+.check-icon {
+  height: 1.1rem;
+  width: 1.1rem;
+  color: #ffffff;
+}
+
+.dark .check-icon {
+  color: #090d11;
+}
+

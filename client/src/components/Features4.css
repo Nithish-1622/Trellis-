@@ -1,0 +1,71 @@
+/* ---- Features4.css ---- */
+.features4-container {
+  position: relative;
+  width: 100%;
+  border-radius: 2rem;
+  padding: 2.5rem 1.5rem;
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 768px) {
+  .features4-container {
+    padding: 3.5rem 3rem;
+  }
+}
+
+.dark .features4-container {
+  background-color: #0f172a;
+  border: 1px solid rgba(30, 41, 59, 0.85);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Feature Tab Button */
+.feature-tab-btn {
+  position: relative;
+  width: 100%;
+  text-align: left;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1.25rem;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.feature-tab-btn:hover {
+  background-color: rgba(241, 245, 249, 0.6);
+}
+
+.dark .feature-tab-btn:hover {
+  background-color: rgba(30, 41, 59, 0.5);
+}
+
+.feature-tab-btn.active {
+  background-color: rgba(240, 253, 244, 0.8);
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);
+}
+
+.dark .feature-tab-btn.active {
+  background-color: rgba(6, 78, 59, 0.25);
+  border-color: rgba(52, 211, 153, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Tab Timer Progress Line */
+.tab-timer-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  border-radius: 9999px;
+}
+
+.dark .tab-timer-progress {
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+

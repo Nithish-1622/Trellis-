@@ -1,0 +1,126 @@
+/* ---- Scheduling1.css ---- */
+.scheduling1-container {
+  width: 100%;
+  border-radius: 2rem;
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.dark .scheduling1-container {
+  background-color: #0f172a;
+  border: 1px solid rgba(30, 41, 59, 0.85);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Calendar Grid */
+.scheduling-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.calendar-day-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background-color: transparent;
+  border: 1px solid transparent;
+  color: #334155;
+}
+
+.dark .calendar-day-cell {
+  color: #cbd5e1;
+}
+
+.calendar-day-cell:hover {
+  background-color: rgba(241, 245, 249, 0.8);
+  border-color: rgba(203, 213, 225, 0.6);
+}
+
+.dark .calendar-day-cell:hover {
+  background-color: rgba(30, 41, 59, 0.6);
+  border-color: rgba(51, 65, 85, 0.8);
+}
+
+.calendar-day-cell.selected {
+  background-color: #059669;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+}
+
+.dark .calendar-day-cell.selected {
+  background-color: #10b981;
+  color: #090d11;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+}
+
+.calendar-day-cell.today:not(.selected) {
+  border-color: #10b981;
+  color: #059669;
+}
+
+.dark .calendar-day-cell.today:not(.selected) {
+  border-color: #34d399;
+  color: #34d399;
+}
+
+.calendar-day-cell.other-month {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Event Dot Indicators */
+.event-dots-row {
+  position: absolute;
+  bottom: 4px;
+  display: flex;
+  gap: 2px;
+}
+
+.event-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+}
+
+.event-dot.green { background-color: #10b981; }
+.event-dot.amber { background-color: #f59e0b; }
+.event-dot.purple { background-color: #8b5cf6; }
+.event-dot.blue { background-color: #3b82f6; }
+
+/* Scrollable Agenda List */
+.agenda-scroll-container {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.agenda-item-card {
+  border-radius: 1.25rem;
+  padding: 1rem 1.25rem;
+  background-color: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  transition: all 0.2s ease;
+}
+
+.dark .agenda-item-card {
+  background-color: rgba(15, 23, 42, 0.6);
+  border-color: rgba(30, 41, 59, 0.8);
+}
+
+.agenda-item-card:hover {
+  transform: translateX(3px);
+  border-color: #10b981;
+}
+
