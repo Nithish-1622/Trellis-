@@ -36,6 +36,7 @@ from interview_agent import get_interview_agent
 from auth import AuthenticatedUser, get_current_user
 from errors import register_error_handlers
 from migration_runner import run_migrations
+from profile_api import router as profile_router
 from typing import Annotated
 
 # Configure logging
@@ -54,6 +55,7 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 register_error_handlers(app)
+app.include_router(profile_router)
 
 # CORS middleware
 app.add_middleware(
