@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 import asyncio
 import ipaddress
 import socket
@@ -15,13 +15,20 @@ from sqlalchemy.orm import Session
 from auth import AuthenticatedUser, get_current_user, require_admin
 from catalog_schemas import (
     DiscoveryJobResponse,
+    ExceptionCategory,
     RecommendationPage,
     ImportResult,
     ResourceBulkCreate,
     ResourceCreate,
+    ResourceEvaluationPage,
+    ResourceInteractionCreate,
+    ResourceInteractionResponse,
+    ResourceModerationRequest,
     ResourcePage,
+    ReevaluationRequest,
     ResourceResponse,
     ResourceType,
+    VerificationStatus,
     ResourceUpdate,
 )
 from catalog_service import CatalogService
@@ -30,6 +37,7 @@ from errors import APIError
 from profile_service import LearnerProfileService
 from resource_providers import ExternalResource, HybridResourceProvider, get_hybrid_resource_provider
 from resource_jobs import ResourceJobService
+from resource_feedback import ResourceFeedbackService, ResourceModerationService
 from rate_limit import SlidingWindowRateLimiter, get_expensive_operation_limiter
 
 
@@ -117,6 +125,21 @@ def get_discovery_job(
     return _job_response(job)
 
 
+@learner_router.post("/{resource_id}/interactions", response_model=ResourceInteractionResponse)
+def record_resource_interaction(
+    resource_id: str,
+    payload: ResourceInteractionCreate,
+    response: Response,
+    identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
+) -> ResourceInteractionResponse:
+    limiter.check(identity.user_id, "resource_interaction")
+    result = ResourceFeedbackService(db).record(identity, resource_id, payload)
+    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
+    return result
+
+
 @admin_router.get("/provider-preview", response_model=list[ExternalResource])
 async def preview_provider_resources(
     query: Annotated[str, Query(min_length=2, max_length=200)],
@@ -135,8 +158,42 @@ def list_resources(
     db: Annotated[Session, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     offset: Annotated[int, Query(ge=0)] = 0,
+    verification_status: VerificationStatus | None = None,
+    exception_category: ExceptionCategory | None = None,
 ) -> ResourcePage:
-    return CatalogService(db).list_admin(limit, offset)
+    return CatalogService(db).list_admin(limit, offset, verification_status, exception_category)
+
+
+@admin_router.get("/{resource_id}/evaluations", response_model=ResourceEvaluationPage)
+def list_resource_evaluations(
+    resource_id: str,
+    _admin: Annotated[AuthenticatedUser, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> ResourceEvaluationPage:
+    return ResourceModerationService(db).evaluations(resource_id, limit, offset)
+
+
+@admin_router.post("/{resource_id}/reevaluate", status_code=status.HTTP_202_ACCEPTED)
+def reevaluate_resource(
+    resource_id: str,
+    payload: ReevaluationRequest,
+    admin: Annotated[AuthenticatedUser, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    job = ResourceModerationService(db).enqueue_reevaluation(admin, resource_id, payload.reason)
+    return {"id": job.id, "status": job.status}
+
+
+@admin_router.post("/{resource_id}/moderate", response_model=ResourceResponse)
+def moderate_resource(
+    resource_id: str,
+    payload: ResourceModerationRequest,
+    admin: Annotated[AuthenticatedUser, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ResourceResponse:
+    return ResourceModerationService(db).moderate(admin, resource_id, payload)
 
 
 @admin_router.post("", response_model=ResourceResponse, status_code=status.HTTP_201_CREATED)

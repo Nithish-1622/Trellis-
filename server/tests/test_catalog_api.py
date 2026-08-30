@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
-from database import Base, LearningResource, ResourceJob, get_db
+from database import Base, LearningResource, ResourceEvaluation, ResourceInteraction, ResourceJob, ResourceModerationAction, ResourceSignalSummary, get_db
 from catalog_api import get_link_checker
 from main import app
 from resource_providers import ExternalResource, get_hybrid_resource_provider
@@ -53,6 +54,7 @@ def resource_payload() -> dict:
         "language": "English",
         "url": "https://academy.example.test/python-api-101",
         "verification_status": "verified",
+        "moderation_reason": "Reviewed against the pilot catalog criteria.",
     }
 
 
@@ -207,3 +209,54 @@ def test_admin_link_check_persists_status_without_exposing_provider_error(catalo
     assert response.status_code == 200
     assert response.json()["link_status"] == "healthy"
     assert db.get(LearningResource, resource_id).link_status == "healthy"
+
+
+def test_learner_feedback_is_idempotent_aggregated_and_reports_enqueue_reevaluation(catalog_client):
+    client, db, identity = catalog_client
+    resource_id = client.post("/v1/admin/resources", json=resource_payload()).json()["id"]
+    identity["user"] = AuthenticatedUser(user_id="learner", email="learner@example.com", name="Learner", roles=["learner"])
+    onboarding = {"current_step": "review", "completed_steps": ["goal", "current_position", "previous_learning", "preferences"], "complete": True, "draft": {"goal": {"free_text": "Become a backend engineer this year", "target_role": "Backend Engineer", "objective": "Build APIs"}, "current_position": {"interests": [], "skills": []}, "previous_learning": {"courses": []}, "preferences": {"preferred_formats": [], "weekly_hours": 8, "accessibility_needs": []}}}
+    assert client.post("/v1/me/onboarding", json=onboarding).status_code == 200
+
+    helpful = {"event_type": "helpful", "idempotency_key": "feedback-helpful-1"}
+    assert client.post(f"/v1/resources/{resource_id}/interactions", json=helpful).status_code == 201
+    duplicate = client.post(f"/v1/resources/{resource_id}/interactions", json=helpful)
+    report = client.post(f"/v1/resources/{resource_id}/interactions", json={"event_type": "report", "idempotency_key": "feedback-report-1", "report_reason": "The material appears outdated."})
+
+    assert duplicate.status_code == 200
+    assert duplicate.json()["created"] is False
+    assert report.status_code == 201
+    assert db.query(ResourceInteraction).count() == 2
+    summary = db.get(ResourceSignalSummary, resource_id)
+    assert summary.helpful == 1
+    assert summary.reports == 1
+    assert db.query(ResourceJob).filter_by(job_type="evaluation").count() == 1
+    identity["user"] = AuthenticatedUser(user_id="admin-user", email="admin@example.com", name="Admin", roles=["learner", "admin"])
+    exceptions = client.get("/v1/admin/resources?exception_category=reports")
+    assert exceptions.status_code == 200
+    assert [item["id"] for item in exceptions.json()["items"]] == [resource_id]
+
+
+def test_admin_moderation_requires_reason_and_preserves_algorithmic_score(catalog_client):
+    client, db, identity = catalog_client
+    resource_id = client.post("/v1/admin/resources", json=resource_payload()).json()["id"]
+    resource = db.get(LearningResource, resource_id)
+    resource.resource_score = 86
+    resource.score_confidence = .7
+    resource.score_version = "trellis-resource-score/v1"
+    db.add(ResourceEvaluation(id="eval-1", resource_id=resource_id, evaluation_version="trellis-resource-score/v1", relevance_score=90, content_quality_score=85, engagement_score=80, creator_score=75, freshness_score=95, final_score=86, confidence=.7, input_fingerprint="fp", evidence={}, evaluated_at=datetime.utcnow()))
+    db.commit()
+
+    assert client.post(f"/v1/admin/resources/{resource_id}/moderate", json={"action": "score_override", "score": 92}).status_code == 422
+    moderated = client.post(f"/v1/admin/resources/{resource_id}/moderate", json={"action": "score_override", "score": 92, "reason": "Exceptional fit confirmed during curriculum review."})
+
+    assert moderated.status_code == 200
+    db.refresh(resource)
+    assert resource.resource_score == 86
+    assert resource.score_override == 92
+    assert db.query(ResourceModerationAction).filter_by(resource_id=resource_id, action_type="score_override").count() == 1
+    history = client.get(f"/v1/admin/resources/{resource_id}/evaluations")
+    assert history.status_code == 200
+    assert history.json()["items"][0]["final_score"] == 86
+    identity["user"] = AuthenticatedUser(user_id="learner", email="learner@example.com", name="Learner", roles=["learner"])
+    assert client.post(f"/v1/admin/resources/{resource_id}/moderate", json={"action": "reject", "reason": "test"}).status_code == 403

@@ -1,6 +1,6 @@
 """Catalog administration and index-first learner resource ranking."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import uuid
 
@@ -20,7 +20,7 @@ from catalog_schemas import (
     ResourceUpdate,
 )
 from config import settings
-from database import LearningHistory, LearningResource, ResourceSkillMap, Skill
+from database import LearningHistory, LearningResource, ResourceEvaluation, ResourceModerationAction, ResourceSignalSummary, ResourceSkillMap, Skill
 from errors import APIError
 from profile_service import LearnerProfileService
 from resource_providers import canonical_resource_key
@@ -38,8 +38,17 @@ class CatalogService:
 
     def create(self, admin: AuthenticatedUser, payload: ResourceCreate) -> ResourceResponse:
         resource = LearningResource(id=str(uuid.uuid4()))
-        self._apply(resource, payload.model_dump(mode="json"), admin.user_id)
+        data = payload.model_dump(mode="json")
+        reason = data.pop("moderation_reason", None)
+        self._apply(resource, data, admin.user_id)
         self.db.add(resource)
+        self.db.flush()
+        if reason:
+            self.db.add(ResourceModerationAction(
+                id=str(uuid.uuid4()), resource_id=resource.id, admin_user_id=admin.user_id,
+                action_type=f"create_{resource.verification_status}", reason=reason,
+                previous_value={}, new_value={"verification_status": resource.verification_status},
+            ))
         try:
             self.db.commit()
         except IntegrityError as exc:
@@ -57,9 +66,17 @@ class CatalogService:
                 skipped += 1
                 continue
             resource = LearningResource(id=str(uuid.uuid4()))
-            self._apply(resource, item.model_dump(mode="json"), admin.user_id)
+            data = item.model_dump(mode="json")
+            reason = data.pop("moderation_reason", None)
+            self._apply(resource, data, admin.user_id)
             self.db.add(resource)
             self.db.flush()
+            if reason:
+                self.db.add(ResourceModerationAction(
+                    id=str(uuid.uuid4()), resource_id=resource.id, admin_user_id=admin.user_id,
+                    action_type=f"create_{resource.verification_status}", reason=reason,
+                    previous_value={}, new_value={"verification_status": resource.verification_status},
+                ))
             created.append(ResourceResponse.model_validate(resource))
         self.db.commit()
         return ImportResult(created=len(created), skipped=skipped, items=created)
@@ -85,8 +102,36 @@ class CatalogService:
         self.db.refresh(resource)
         return ResourceResponse.model_validate(resource)
 
-    def list_admin(self, limit: int, offset: int) -> ResourcePage:
+    def list_admin(self, limit: int, offset: int, verification_status: str | None = None, exception_category: str | None = None) -> ResourcePage:
         query = self.db.query(LearningResource)
+        if verification_status:
+            query = query.filter(LearningResource.verification_status == verification_status)
+        if exception_category in {"reports", "heavily_used"}:
+            query = query.join(ResourceSignalSummary, ResourceSignalSummary.resource_id == LearningResource.id)
+            query = query.filter(ResourceSignalSummary.reports > 0) if exception_category == "reports" else query.filter(ResourceSignalSummary.impressions >= 100)
+        elif exception_category == "low_confidence_high_score":
+            query = query.filter(
+                LearningResource.resource_score >= settings.RESOURCE_VETTED_SCORE_THRESHOLD,
+                LearningResource.score_confidence < settings.RESOURCE_MIN_CONFIDENCE,
+            )
+        elif exception_category == "stale":
+            query = query.filter(or_(
+                LearningResource.last_evaluated_at.is_(None),
+                LearningResource.last_evaluated_at < datetime.utcnow() - timedelta(days=90),
+            ))
+        elif exception_category == "unusual_new_creator":
+            query = query.filter(
+                LearningResource.author.is_not(None), LearningResource.resource_score >= 85,
+                LearningResource.score_confidence < .65,
+                LearningResource.created_at >= datetime.utcnow() - timedelta(days=30),
+            )
+        elif exception_category == "score_drop":
+            dropped_ids = []
+            for resource_id, in self.db.query(ResourceEvaluation.resource_id).distinct():
+                scores = [row.final_score for row in self.db.query(ResourceEvaluation).filter_by(resource_id=resource_id).order_by(ResourceEvaluation.evaluated_at.desc()).limit(2)]
+                if len(scores) == 2 and scores[1] - scores[0] >= 10:
+                    dropped_ids.append(resource_id)
+            query = query.filter(LearningResource.id.in_(dropped_ids))
         total = query.count()
         items = query.order_by(LearningResource.updated_at.desc()).offset(offset).limit(limit).all()
         return ResourcePage(items=[ResourceResponse.model_validate(item) for item in items], total=total, limit=limit, offset=offset)

@@ -3,11 +3,12 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, model_validator
 
 
 ResourceType = Literal["course", "video", "project", "article", "assessment"]
 VerificationStatus = Literal["verified", "vetted", "discovered", "rejected"]
+ExceptionCategory = Literal["reports", "low_confidence_high_score", "score_drop", "stale", "heavily_used", "unusual_new_creator"]
 
 
 class ResourceCreate(BaseModel):
@@ -27,7 +28,14 @@ class ResourceCreate(BaseModel):
     url: AnyHttpUrl
     thumbnail_url: AnyHttpUrl | None = None
     verification_status: VerificationStatus = "discovered"
+    moderation_reason: str | None = Field(default=None, min_length=10, max_length=1000)
     metadata: dict = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def require_trust_reason(self) -> "ResourceCreate":
+        if self.verification_status in {"verified", "rejected"} and not self.moderation_reason:
+            raise ValueError("A moderation reason is required for verified or rejected resources")
+        return self
 
 
 class ResourceUpdate(BaseModel):
@@ -46,7 +54,6 @@ class ResourceUpdate(BaseModel):
     language: str | None = Field(default=None, min_length=1, max_length=100)
     url: AnyHttpUrl | None = None
     thumbnail_url: AnyHttpUrl | None = None
-    verification_status: VerificationStatus | None = None
     metadata: dict | None = None
 
 
@@ -143,3 +150,73 @@ class DiscoveryJobResponse(BaseModel):
     failure_code: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
+
+
+InteractionType = Literal["impression", "open", "helpful", "not_helpful", "report"]
+
+
+class ResourceInteractionCreate(BaseModel):
+    event_type: InteractionType
+    idempotency_key: str = Field(min_length=8, max_length=120, pattern=r"^[A-Za-z0-9._:-]+$")
+    session_id: str | None = Field(default=None, max_length=120)
+    milestone_id: str | None = Field(default=None, max_length=100)
+    report_reason: str | None = Field(default=None, min_length=5, max_length=1000)
+
+    @model_validator(mode="after")
+    def require_report_reason(self) -> "ResourceInteractionCreate":
+        if self.event_type == "report" and not self.report_reason:
+            raise ValueError("A report reason is required")
+        if self.event_type != "report" and self.report_reason:
+            raise ValueError("A report reason is only accepted for report events")
+        return self
+
+
+class ResourceInteractionResponse(BaseModel):
+    id: str
+    resource_id: str
+    event_type: InteractionType
+    created: bool
+    created_at: datetime
+
+
+class ResourceModerationRequest(BaseModel):
+    action: Literal["verify", "reject", "pin", "unpin", "suppress", "unsuppress", "score_override", "clear_score_override"]
+    reason: str = Field(min_length=10, max_length=1000)
+    score: float | None = Field(default=None, ge=0, le=100)
+
+    @model_validator(mode="after")
+    def validate_score_action(self) -> "ResourceModerationRequest":
+        if self.action == "score_override" and self.score is None:
+            raise ValueError("A score is required for score_override")
+        if self.action != "score_override" and self.score is not None:
+            raise ValueError("A score is only accepted for score_override")
+        return self
+
+
+class ResourceEvaluationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    evaluation_version: str
+    relevance_score: float
+    content_quality_score: float
+    engagement_score: float
+    creator_score: float
+    freshness_score: float
+    final_score: float
+    confidence: float
+    model_version: str | None
+    input_fingerprint: str
+    evidence: dict
+    evaluated_at: datetime
+
+
+class ResourceEvaluationPage(BaseModel):
+    items: list[ResourceEvaluationResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class ReevaluationRequest(BaseModel):
+    reason: str = Field(min_length=10, max_length=1000)
