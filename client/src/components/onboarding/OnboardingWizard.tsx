@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getOnboarding, saveOnboarding } from '../../services/onboardingService'
 import type { OnboardingDraft, OnboardingStep } from '../../services/onboardingService'
 import { trackOnboardingEvent } from '../../services/analytics'
+import { createRoadmap } from '../../services/roadmapService'
 import CurrentPositionStep from './CurrentPositionStep'
 import GoalStep from './GoalStep'
 import HistoryStep from './HistoryStep'
@@ -34,6 +35,7 @@ export default function OnboardingWizard() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [profileSaved, setProfileSaved] = useState(false)
   const mainRef = useRef<HTMLDivElement>(null)
   const currentStepRef = useRef<OnboardingStep>('goal')
   const completedRef = useRef(false)
@@ -98,7 +100,13 @@ export default function OnboardingWizard() {
       trackOnboardingEvent(complete ? 'onboarding_completed' : 'onboarding_step_completed', currentStep)
       if (complete) {
         completedRef.current = true
-        navigate('/profile', { replace: true })
+        setProfileSaved(true)
+        try {
+          await createRoadmap()
+          navigate('/roadmap', { replace: true })
+        } catch (generationError) {
+          setError(`Your profile is saved. ${generationError instanceof Error ? generationError.message : 'We could not generate your roadmap.'} You can retry without repeating onboarding.`)
+        }
       }
       else { setCurrentStep(nextStep); trackOnboardingEvent('onboarding_step_viewed', nextStep) }
     } catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'We could not save your progress. Please try again.') }
@@ -130,7 +138,7 @@ export default function OnboardingWizard() {
       {currentStep === 'previous_learning' && <HistoryStep value={draft.previous_learning!} onChange={(previous_learning) => setDraft({ ...draft, previous_learning })} />}
       {currentStep === 'preferences' && <PreferencesStep value={draft.preferences!} onChange={(preferences) => setDraft({ ...draft, preferences })} errors={fieldErrors} />}
       {currentStep === 'review' && <ReviewStep draft={draft} onEdit={setCurrentStep} />}
-      <div className="mt-8 flex items-center justify-between gap-4 border-t border-zinc-200 pt-5 dark:border-zinc-800"><button type="button" onClick={goBack} disabled={index === 0 || isSaving} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:invisible dark:text-zinc-300 dark:hover:bg-zinc-800">Back</button><button type="button" onClick={() => currentStep === 'review' ? saveAndMove('review', true) : saveAndMove(steps[index + 1].id)} disabled={isSaving} className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">{isSaving ? 'Saving…' : currentStep === 'review' ? 'Confirm and create roadmap' : 'Continue'}</button></div>
+      <div className="mt-8 flex items-center justify-between gap-4 border-t border-zinc-200 pt-5 dark:border-zinc-800"><button type="button" onClick={goBack} disabled={index === 0 || isSaving || profileSaved} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:invisible dark:text-zinc-300 dark:hover:bg-zinc-800">Back</button><button type="button" onClick={() => currentStep === 'review' ? saveAndMove('review', true) : saveAndMove(steps[index + 1].id)} disabled={isSaving} className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">{isSaving ? (profileSaved ? 'Building roadmap…' : 'Saving…') : currentStep === 'review' ? (profileSaved ? 'Retry roadmap generation' : 'Confirm and create roadmap') : 'Continue'}</button></div>
     </div>
   </div>
 }

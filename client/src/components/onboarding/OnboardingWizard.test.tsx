@@ -7,11 +7,13 @@ const { getOnboarding, saveOnboarding, analyzeGoal } = vi.hoisted(() => ({
   saveOnboarding: vi.fn(),
   analyzeGoal: vi.fn(),
 }))
+const { createRoadmap } = vi.hoisted(() => ({ createRoadmap: vi.fn() }))
 
 vi.mock('../../services/onboardingService', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../services/onboardingService')>()
   return { ...original, getOnboarding, saveOnboarding, analyzeGoal }
 })
+vi.mock('../../services/roadmapService', () => ({ createRoadmap }))
 
 import OnboardingWizard from './OnboardingWizard'
 
@@ -108,6 +110,7 @@ describe('OnboardingWizard', () => {
       target_date: null,
       explanation: 'The role and outcome were stated directly.',
     })
+    createRoadmap.mockResolvedValue({})
     renderWizard()
     const goal = await screen.findByLabelText('What do you want to achieve?')
 
@@ -159,5 +162,28 @@ describe('OnboardingWizard', () => {
 
     expect(await screen.findByLabelText('What do you want to achieve?')).toBeVisible()
     expect(getOnboarding).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps confirmed profile data when roadmap generation fails', async () => {
+    getOnboarding.mockResolvedValue({
+      ...emptySession,
+      current_step: 'review',
+      completed_steps: ['goal', 'current_position', 'previous_learning', 'preferences'],
+      draft: {
+        goal: { free_text: 'Become a backend engineer this year', target_role: 'Backend Engineer', objective: 'Build reliable APIs', target_date: null },
+        current_position: { current_role: '', experience_years: 0, education_level: '', interests: [], skills: [] },
+        previous_learning: { courses: [] },
+        preferences: { preferred_formats: [], project_theory_balance: 50, learning_pace: 'steady', weekly_hours: 8, preferred_language: 'English', budget: null, accessibility_needs: [], preferred_session_minutes: 45 },
+      },
+    })
+    createRoadmap.mockRejectedValueOnce(new Error('Provider unavailable'))
+    renderWizard()
+    await screen.findByRole('heading', { name: 'Review your learning profile' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and create roadmap' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your profile is saved')
+    expect(screen.getByRole('button', { name: 'Retry roadmap generation' })).toBeEnabled()
+    expect(saveOnboarding).toHaveBeenCalledWith(expect.objectContaining({ complete: true }))
   })
 })
