@@ -318,6 +318,134 @@ class Roadmap(Base):
     milestones = relationship("Milestone", back_populates="roadmap", cascade="all, delete-orphan")
 
 
+class RoadmapVersion(Base):
+    """Immutable snapshot boundary for an active or proposed roadmap revision."""
+    __tablename__ = "roadmap_versions"
+    __table_args__ = (
+        UniqueConstraint("roadmap_id", "version_number", name="uq_roadmap_version_number"),
+        Index("ix_roadmap_versions_roadmap_status", "roadmap_id", "status"),
+    )
+
+    id = Column(String, primary_key=True)
+    roadmap_id = Column(String, ForeignKey("roadmaps.id", ondelete="CASCADE"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    status = Column(String, nullable=False, default="active")
+    rationale = Column(Text, nullable=True)
+    change_summary = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    activated_at = Column(DateTime, nullable=True)
+
+    milestones = relationship("RoadmapMilestone", back_populates="version", cascade="all, delete-orphan")
+
+
+class RoadmapMilestone(Base):
+    """Prerequisite-aware, version-specific unit of a personalized learning path."""
+    __tablename__ = "roadmap_milestones"
+    __table_args__ = (
+        UniqueConstraint("version_id", "stable_key", name="uq_roadmap_milestone_version_key"),
+        Index("ix_roadmap_milestones_version_sequence", "version_id", "sequence"),
+    )
+
+    id = Column(String, primary_key=True)
+    version_id = Column(String, ForeignKey("roadmap_versions.id", ondelete="CASCADE"), nullable=False)
+    stable_key = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    sequence = Column(Integer, nullable=False)
+    prerequisite_keys = Column(JSON, nullable=False, default=list)
+    target_skills = Column(JSON, nullable=False, default=list)
+    estimated_hours = Column(Float, nullable=False)
+    scheduled_start = Column(DateTime, nullable=True)
+    deadline = Column(DateTime, nullable=True)
+    status = Column(String, nullable=False, default="not_started")
+    progress_percentage = Column(Integer, nullable=False, default=0)
+    recommended_resources = Column(JSON, nullable=False, default=list)
+    assessment_config = Column(JSON, nullable=False, default=dict)
+    explanation = Column(JSON, nullable=False, default=dict)
+    reflection = Column(Text, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    version = relationship("RoadmapVersion", back_populates="milestones")
+
+
+class LearningActivity(Base):
+    """Learner progress for a resource attached to a roadmap milestone."""
+    __tablename__ = "learning_activities"
+    __table_args__ = (Index("ix_learning_activities_user_milestone", "user_id", "milestone_id"),)
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    milestone_id = Column(String, ForeignKey("roadmap_milestones.id", ondelete="CASCADE"), nullable=False)
+    resource_id = Column(String, nullable=True)
+    resource_url = Column(String, nullable=False)
+    resource_title = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="not_started")
+    progress_percentage = Column(Integer, nullable=False, default=0)
+    time_spent_minutes = Column(Integer, nullable=False, default=0)
+    usefulness_rating = Column(Integer, nullable=True)
+    difficulty_rating = Column(Integer, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AssessmentAttempt(Base):
+    """Objective quiz or provisional project-rubric evidence."""
+    __tablename__ = "assessment_attempts"
+    __table_args__ = (Index("ix_assessment_attempts_user_milestone", "user_id", "milestone_id"),)
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    milestone_id = Column(String, ForeignKey("roadmap_milestones.id", ondelete="CASCADE"), nullable=False)
+    assessment_type = Column(String, nullable=False)
+    questions = Column(JSON, nullable=False, default=list)
+    answers = Column(JSON, nullable=False, default=list)
+    rubric = Column(JSON, nullable=False, default=list)
+    score = Column(Float, nullable=False)
+    rationale = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=False)
+    provisional = Column(Boolean, nullable=False, default=False)
+    reflection = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AdaptationProposal(Base):
+    """Learner-confirmed diff between immutable roadmap versions."""
+    __tablename__ = "adaptation_proposals"
+    __table_args__ = (Index("ix_adaptation_proposals_user_status", "user_id", "status"),)
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    roadmap_id = Column(String, ForeignKey("roadmaps.id", ondelete="CASCADE"), nullable=False)
+    base_version_id = Column(String, ForeignKey("roadmap_versions.id", ondelete="CASCADE"), nullable=False)
+    proposed_version_id = Column(String, ForeignKey("roadmap_versions.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    diff = Column(JSON, nullable=False, default=dict)
+    evidence_ids = Column(JSON, nullable=False, default=list)
+    feedback = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    decided_at = Column(DateTime, nullable=True)
+
+
+class InterviewEvidenceSession(Base):
+    """Persistent interview session that can produce weighted topic evidence."""
+    __tablename__ = "interview_evidence_sessions"
+    __table_args__ = (Index("ix_interview_evidence_sessions_user", "user_id", "created_at"),)
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    target_role = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="in_progress")
+    transcript = Column(JSON, nullable=False, default=list)
+    topic_scores = Column(JSON, nullable=False, default=dict)
+    overall_score = Column(Float, nullable=True)
+    evidence_ids = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
 # Database setup
 engine = create_engine(settings.DATABASE_URL, echo=settings.DEBUG)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
