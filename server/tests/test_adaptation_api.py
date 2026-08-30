@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
-from database import AdaptationProposal, Base, RoadmapVersion, get_db
+from database import AdaptationProposal, Base, RoadmapVersion, SkillEvidence, get_db
 from main import app
 
 
@@ -79,3 +79,24 @@ def test_strong_evidence_proposes_acceleration_and_rejection_keeps_active_versio
     assert client.get("/v1/roadmaps/current").json()["version_number"] == 1
     stored = db.get(AdaptationProposal, proposal["id"])
     assert stored.feedback == "I want the extra practice."
+
+
+def test_lower_weight_career_gap_can_only_propose_learner_confirmed_remediation(adaptation_client):
+    client, db, context = adaptation_client
+    application = client.post("/v1/career/applications", json={
+        "company": "Example Co", "position": "Backend Engineer", "status": "interviewed",
+        "feedback": "Strengthen Python fundamentals", "interview_topics": ["Python"],
+    })
+    assert application.status_code == 201
+    evidence = db.query(SkillEvidence).filter(SkillEvidence.source_type == "application_feedback").one()
+
+    proposal = client.post(
+        f"/v1/roadmaps/{context['roadmap']['id']}/adaptations",
+        json={"evidence_ids": [evidence.id]},
+    )
+
+    assert proposal.status_code == 201
+    assert proposal.json()["status"] == "pending"
+    assert proposal.json()["diff"]["additions"][0]["reason"] == "remediation"
+    assert "30% evidence weight" in proposal.json()["diff"]["explanation"]
+    assert client.get("/v1/roadmaps/current").json()["version_number"] == 1

@@ -1,6 +1,7 @@
 """Create and atomically decide immutable roadmap adaptation proposals."""
 
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import uuid
 
@@ -9,8 +10,18 @@ from sqlalchemy.orm import Session
 
 from adaptation_schemas import AdaptationRequest, AdaptationResponse
 from auth import AuthenticatedUser
-from database import AdaptationProposal, AssessmentAttempt, Roadmap, RoadmapMilestone, RoadmapVersion
+from database import AdaptationProposal, AssessmentAttempt, Roadmap, RoadmapMilestone, RoadmapVersion, SkillEvidence
 from errors import APIError
+from roadmap_engine import canonical_skill_name
+
+
+@dataclass(frozen=True)
+class EvidenceSignal:
+    id: str
+    milestone: RoadmapMilestone
+    score: float
+    weight: float
+    source_label: str
 
 
 class AdaptationService:
@@ -25,20 +36,22 @@ class AdaptationService:
         if self.db.query(AdaptationProposal).filter(AdaptationProposal.user_id == identity.user_id, AdaptationProposal.roadmap_id == roadmap.id, AdaptationProposal.status == "pending").first():
             raise APIError(status_code=409, code="ADAPTATION_PENDING", message="Decide the pending adaptation before creating another")
 
-        attempt = self._latest_attempt(identity.user_id, base.id, request.evidence_ids)
-        if attempt is None:
-            raise APIError(status_code=409, code="ADAPTATION_EVIDENCE_REQUIRED", message="New assessment evidence is required")
-        assessed = self.db.get(RoadmapMilestone, attempt.milestone_id)
-        if assessed is None or assessed.status == "completed":
+        signal = self._latest_evidence(identity.user_id, base.id, request.evidence_ids)
+        if signal is None:
+            raise APIError(status_code=409, code="ADAPTATION_EVIDENCE_REQUIRED", message="New assessment or career evidence is required")
+        assessed = signal.milestone
+        if assessed.status == "completed":
             raise APIError(status_code=409, code="NO_UNFINISHED_CHANGE", message="Completed roadmap content cannot be adapted")
-        mode = "remediation" if attempt.score < 0.5 else "acceleration" if attempt.score >= 0.8 else None
+        weak_threshold = 0.5 if signal.weight >= 0.7 else 0.35
+        strong_threshold = 0.8 if signal.weight >= 0.7 else 0.9
+        mode = "remediation" if signal.score <= weak_threshold else "acceleration" if signal.score >= strong_threshold else None
         if mode is None:
             raise APIError(status_code=409, code="NO_MEANINGFUL_ADAPTATION", message="Current evidence does not justify a roadmap change")
 
         version_number = (self.db.query(func.max(RoadmapVersion.version_number)).filter(RoadmapVersion.roadmap_id == roadmap.id).scalar() or 0) + 1
         proposed = RoadmapVersion(
             id=str(uuid.uuid4()), roadmap_id=roadmap.id, version_number=version_number, status="proposed",
-            rationale=f"{mode.title()} proposed from {attempt.assessment_type} evidence scored at {attempt.score:.0%}.",
+            rationale=f"{mode.title()} proposed from {signal.source_label} evidence scored at {signal.score:.0%} with {signal.weight:.0%} evidence weight.",
             change_summary={}, created_at=datetime.utcnow(), activated_at=None,
         )
         self.db.add(proposed)
@@ -48,7 +61,7 @@ class AdaptationService:
         proposal = AdaptationProposal(
             id=str(uuid.uuid4()), user_id=identity.user_id, roadmap_id=roadmap.id,
             base_version_id=base.id, proposed_version_id=proposed.id, status="pending", diff=diff,
-            evidence_ids=[attempt.id], created_at=datetime.utcnow(),
+            evidence_ids=[signal.id], created_at=datetime.utcnow(),
         )
         self.db.add(proposal)
         self.db.commit()
@@ -150,11 +163,36 @@ class AdaptationService:
             reflection=item.reflection, completed_at=item.completed_at,
         )
 
-    def _latest_attempt(self, user_id: str, version_id: str, evidence_ids: list[str]) -> AssessmentAttempt | None:
+    def _latest_evidence(self, user_id: str, version_id: str, evidence_ids: list[str]) -> EvidenceSignal | None:
         query = self.db.query(AssessmentAttempt).join(RoadmapMilestone, AssessmentAttempt.milestone_id == RoadmapMilestone.id).filter(AssessmentAttempt.user_id == user_id, RoadmapMilestone.version_id == version_id)
         if evidence_ids:
             query = query.filter(AssessmentAttempt.id.in_(evidence_ids))
-        return query.order_by(AssessmentAttempt.created_at.desc()).first()
+        attempt = query.order_by(AssessmentAttempt.created_at.desc()).first()
+        if attempt is not None:
+            milestone = self.db.get(RoadmapMilestone, attempt.milestone_id)
+            if milestone is not None:
+                weight = 0.7 if attempt.provisional else 1.0
+                return EvidenceSignal(attempt.id, milestone, attempt.score, weight, attempt.assessment_type)
+
+        career_query = self.db.query(SkillEvidence).filter(
+            SkillEvidence.user_id == user_id,
+            SkillEvidence.source_type.in_(["interview", "application_feedback"]),
+        )
+        if evidence_ids:
+            career_query = career_query.filter(SkillEvidence.id.in_(evidence_ids))
+        career_evidence = career_query.order_by(SkillEvidence.observed_at.desc()).first()
+        if career_evidence is None:
+            return None
+        skill_name = canonical_skill_name(career_evidence.skill.display_name)
+        milestones = self.db.query(RoadmapMilestone).filter(
+            RoadmapMilestone.version_id == version_id,
+            RoadmapMilestone.status != "completed",
+        ).order_by(RoadmapMilestone.sequence).all()
+        milestone = next((item for item in milestones if skill_name in {canonical_skill_name(name) for name in (item.target_skills or [])}), None)
+        if milestone is None:
+            return None
+        score = career_evidence.score if career_evidence.score is not None else 0.35
+        return EvidenceSignal(career_evidence.id, milestone, score, career_evidence.weight, career_evidence.source_type)
 
     def _roadmap(self, identity: AuthenticatedUser, roadmap_id: str) -> Roadmap:
         roadmap = self.db.query(Roadmap).filter(Roadmap.id == roadmap_id, Roadmap.user_id == identity.user_id).first()
