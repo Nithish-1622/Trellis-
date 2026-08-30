@@ -14,10 +14,10 @@ from learning_history_schemas import (
     LearningHistoryCreate,
     LearningHistoryPage,
     LearningHistoryResponse,
-    ResumeEvidenceResponse,
+    ResumeCapabilitiesResponse,
+    ResumeSkillSuggestion,
 )
 from learning_history_service import LearningHistoryService, MAX_CSV_BYTES
-from profile_service import LearnerProfileService
 from resume_parser import resume_parser
 
 
@@ -90,14 +90,61 @@ async def import_learning_history_csv(
     return LearningHistoryService(db).import_csv(identity, await _read_csv(file), allow_partial)
 
 
-@router.post("/resume/parse", response_model=ResumeEvidenceResponse)
+def _clean_optional_text(value: object, limit: int) -> str | None:
+    text = str(value).strip() if value is not None else ""
+    return text[:limit] or None
+
+
+def _resume_skills(raw_skills: object) -> list[ResumeSkillSuggestion]:
+    if not isinstance(raw_skills, list):
+        return []
+    suggestions: list[ResumeSkillSuggestion] = []
+    seen: set[str] = set()
+    allowed_levels = {"beginner", "intermediate", "advanced", "expert"}
+    for raw_skill in raw_skills:
+        if isinstance(raw_skill, dict):
+            name = _clean_optional_text(raw_skill.get("name"), 100)
+            level = str(raw_skill.get("proficiency", "beginner")).casefold()
+            rationale = _clean_optional_text(raw_skill.get("rationale"), 500)
+        else:
+            name = _clean_optional_text(raw_skill, 100)
+            level = "beginner"
+            rationale = None
+        canonical_name = name.casefold() if name else ""
+        if not name or canonical_name in seen:
+            continue
+        seen.add(canonical_name)
+        suggestions.append(ResumeSkillSuggestion(
+            name=name,
+            proficiency=level if level in allowed_levels else "beginner",
+            rationale=rationale,
+        ))
+        if len(suggestions) == 50:
+            break
+    return suggestions
+
+
+def _resume_list(raw_values: object, *, object_key: str | None = None) -> list[str]:
+    if not isinstance(raw_values, list):
+        return []
+    values: list[str] = []
+    for raw_value in raw_values:
+        value = raw_value.get(object_key) if object_key and isinstance(raw_value, dict) else raw_value
+        text = _clean_optional_text(value, 200)
+        if text and text.casefold() not in {item.casefold() for item in values}:
+            values.append(text)
+        if len(values) == 20:
+            break
+    return values
+
+
+@router.post("/resume/parse", response_model=ResumeCapabilitiesResponse)
 async def parse_resume_evidence(
     file: Annotated[UploadFile, File(...)],
     identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
     parser: Annotated[ResumeParserProtocol, Depends(get_resume_parser)],
     resume_file_id: Annotated[str | None, Form()] = None,
-) -> ResumeEvidenceResponse:
+) -> ResumeCapabilitiesResponse:
     if file.content_type not in ALLOWED_RESUME_TYPES:
         raise APIError(status_code=415, code="UPLOAD_TYPE_INVALID", message="Upload a PDF or DOCX resume")
     content = await file.read(MAX_RESUME_BYTES + 1)
@@ -105,18 +152,18 @@ async def parse_resume_evidence(
         raise APIError(status_code=413, code="UPLOAD_TOO_LARGE", message="Resume files must be 5 MB or smaller")
 
     parsed = await parser.parse_resume(content, file.content_type or "")
-    skills = [str(skill).strip() for skill in parsed.get("skills", []) if str(skill).strip()][:100]
-    profile_service = LearnerProfileService(db)
-    profile = profile_service.ensure_profile(identity)
-    profile.resume_filename = (file.filename or "resume")[:255]
-    profile.resume_file_id = resume_file_id
-    added = profile_service.add_resume_evidence(identity.user_id, skills)
-    db.commit()
-    return ResumeEvidenceResponse(
-        filename=profile.resume_filename,
-        skills_found=skills,
-        skills_added=added,
-        evidence_count=len(skills),
-        education_count=len(parsed.get("education", [])),
-        experience_count=len(parsed.get("experience", [])),
+    experience_years = parsed.get("experience_years")
+    try:
+        experience_years = min(max(float(experience_years), 0), 80) if experience_years is not None else None
+    except (TypeError, ValueError):
+        experience_years = None
+    return ResumeCapabilitiesResponse(
+        filename=(file.filename or "resume")[:255],
+        resume_file_id=_clean_optional_text(resume_file_id, 255),
+        current_role=_clean_optional_text(parsed.get("current_role"), 200),
+        experience_years=experience_years,
+        education_level=_clean_optional_text(parsed.get("education_level"), 200),
+        skills=_resume_skills(parsed.get("skills")),
+        certifications=_resume_list(parsed.get("certifications")),
+        projects=_resume_list(parsed.get("projects"), object_key="name"),
     )

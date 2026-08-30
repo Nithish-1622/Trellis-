@@ -127,24 +127,25 @@ def test_history_upload_rejects_wrong_media_type_with_error_envelope(history_cli
     assert response.json()["error"]["code"] == "UPLOAD_TYPE_INVALID"
 
 
-def test_resume_skills_add_evidence_without_downgrading_existing_skill(history_client):
+def test_resume_parse_returns_editable_capabilities_without_persisting_claims(history_client):
     client, db, _identity = history_client
-    onboarding = {
-        "current_step": "review",
-        "completed_steps": ["goal", "current_position", "previous_learning", "preferences"],
-        "complete": True,
-        "draft": {
-            "goal": {"free_text": "Become a backend engineer this year", "target_role": "Backend Engineer", "objective": "Build reliable APIs"},
-            "current_position": {"interests": [], "skills": [{"name": "Python", "proficiency": "intermediate", "evidence_source": "self_reported"}]},
-            "previous_learning": {"courses": []},
-            "preferences": {"preferred_formats": [], "weekly_hours": 8, "accessibility_needs": []},
-        },
-    }
-    assert client.post("/v1/me/onboarding", json=onboarding).status_code == 200
-
     class StubResumeParser:
         async def parse_resume(self, _content: bytes, _content_type: str):
-            return {"skills": ["Python", "Docker"], "education": [], "experience": []}
+            return {
+                "current_role": "Backend Engineer",
+                "experience_years": 4.5,
+                "education_level": "BSc Computer Science",
+                "skills": [
+                    {
+                        "name": "Python",
+                        "proficiency": "advanced",
+                        "rationale": "Used across two recent backend roles.",
+                    },
+                    {"name": "Docker", "proficiency": "intermediate"},
+                ],
+                "certifications": ["AWS Developer Associate"],
+                "projects": [{"name": "Payments API"}],
+            }
 
     from learning_history_api import get_resume_parser
 
@@ -152,11 +153,26 @@ def test_resume_skills_add_evidence_without_downgrading_existing_skill(history_c
     response = client.post(
         "/v1/me/resume/parse",
         files={"file": ("resume.pdf", BytesIO(b"%PDF-test"), "application/pdf")},
+        data={"resume_file_id": "resume-file-1"},
     )
 
     assert response.status_code == 200
-    python_skill = db.query(LearnerSkill).filter(LearnerSkill.display_name == "Python").one()
-    assert python_skill.proficiency == "intermediate"
-    assert python_skill.source == "self_reported"
-    assert db.query(LearnerSkill).filter(LearnerSkill.display_name == "Docker").count() == 1
-    assert db.query(SkillEvidence).count() == 2
+    assert response.json() == {
+        "filename": "resume.pdf",
+        "resume_file_id": "resume-file-1",
+        "current_role": "Backend Engineer",
+        "experience_years": 4.5,
+        "education_level": "BSc Computer Science",
+        "skills": [
+            {
+                "name": "Python",
+                "proficiency": "advanced",
+                "rationale": "Used across two recent backend roles.",
+            },
+            {"name": "Docker", "proficiency": "intermediate", "rationale": None},
+        ],
+        "certifications": ["AWS Developer Associate"],
+        "projects": ["Payments API"],
+    }
+    assert db.query(LearnerSkill).count() == 0
+    assert db.query(SkillEvidence).count() == 0

@@ -94,6 +94,9 @@ class ResumeParser:
     "name": "Full Name",
     "email": "email@example.com",
     "phone": "phone number or null",
+    "current_role": "Most recent role or null",
+    "experience_years": 4.5,
+    "education_level": "Highest relevant degree or learning path, or null",
     "education": [
         {{
             "degree": "Degree Name",
@@ -110,7 +113,13 @@ class ResumeParser:
             "description": "Brief description"
         }}
     ],
-    "skills": ["skill1", "skill2", "skill3"],
+    "skills": [
+        {{
+            "name": "Python",
+            "proficiency": "beginner|intermediate|advanced|expert",
+            "rationale": "Short resume-grounded reason for the suggested level"
+        }}
+    ],
     "certifications": ["cert1", "cert2"],
     "projects": [
         {{

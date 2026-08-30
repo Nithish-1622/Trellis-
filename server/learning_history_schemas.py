@@ -1,6 +1,7 @@
 """Contracts for learner-owned history imports and resume evidence."""
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -61,10 +62,18 @@ class CsvImportResponse(BaseModel):
     rows: list[CsvPreviewRow]
 
 
-class ResumeEvidenceResponse(BaseModel):
+class ResumeSkillSuggestion(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    proficiency: Literal["beginner", "intermediate", "advanced", "expert"]
+    rationale: str | None = Field(default=None, max_length=500)
+
+
+class ResumeCapabilitiesResponse(BaseModel):
     filename: str
-    skills_found: list[str]
-    skills_added: list[str]
-    evidence_count: int
-    education_count: int
-    experience_count: int
+    resume_file_id: str | None
+    current_role: str | None
+    experience_years: float | None
+    education_level: str | None
+    skills: list[ResumeSkillSuggestion]
+    certifications: list[str]
+    projects: list[str]
