@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
+import { useThemeContext } from '../hooks/useThemeContext';
 import { Link } from 'react-router-dom';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 import ProfileNavbar from '../components/profile-components/ProfileNavbar';
@@ -8,7 +8,7 @@ import DashboardOverview from '../components/profile-components/DashboardOvervie
 import CourseExplorer from '../components/profile-components/CourseExplorer';
 import ProfileSettings from '../components/profile-components/ProfileSettings';
 
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { getMemorySummary } from '../services/agentService';
 
 const Profile: React.FC = () => {
@@ -20,6 +20,8 @@ const Profile: React.FC = () => {
     const [name, setName] = useState(user?.name || 'John Doe');
     const [email, setEmail] = useState(user?.email || 'john@example.com');
     const [bio, setBio] = useState('Passionate learner exploring the world of technology.');
+    const [photo, setPhoto] = useState<string | null>(null);
+    const [resumeName, setResumeName] = useState<string | null>(null);
 
     // Dynamic Stats State
     const [stats, setStats] = useState<{
@@ -53,9 +55,6 @@ const Profile: React.FC = () => {
             }).catch(err => console.error("Failed to fetch profile stats:", err));
         }
     }, [user]);
-
-    const [photo, setPhoto] = useState<string | null>(null);
-    const [resumeName, setResumeName] = useState<string | null>(null);
 
     const getInitials = (n: string) => {
         return n.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useThemeContext } from '../../contexts/ThemeContext';
+import { useThemeContext } from '../../hooks/useThemeContext';
 
 const Assistant3DCard: React.FC = () => {
     const { darkMode } = useThemeContext();

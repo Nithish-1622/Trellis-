@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useThemeContext } from '../hooks/useThemeContext';
+import { useAuth } from '../hooks/useAuth';
 import { startInterview, submitInterviewAnswer, getInterviewReport } from '../services/agentService';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 
 const InterviewPrep: React.FC = () => {
     const { darkMode } = useThemeContext();
     const { user } = useAuth();
+    const savedTargetRole = user?.prefs.target_role;
 
     // Stages: 'setup', 'interview', 'report'
     const [stage, setStage] = useState<'setup' | 'interview' | 'report'>('setup');
 
     // Setup State
-    const [targetRole, setTargetRole] = useState(user?.target_role || "Software Engineer");
+    const [targetRole, setTargetRole] = useState(
+        typeof savedTargetRole === 'string' ? savedTargetRole : 'Software Engineer',
+    );
     const [focusArea, setFocusArea] = useState("React & System Design");
     const [isLoading, setIsLoading] = useState(false);
 
@@ -28,6 +31,8 @@ const InterviewPrep: React.FC = () => {
     const [report, setReport] = useState<any>(null);
 
     const handleStart = async () => {
+        if (!user) return;
+
         setIsLoading(true);
         try {
             const data = await startInterview(user.$id, targetRole, focusArea);
@@ -44,7 +49,7 @@ const InterviewPrep: React.FC = () => {
     };
 
     const handleSubmitAnswer = async () => {
-        if (!userAnswer.trim()) return;
+        if (!user || !userAnswer.trim()) return;
         setIsLoading(true);
         try {
             const data = await submitInterviewAnswer(user.$id, sessionId!, userAnswer);

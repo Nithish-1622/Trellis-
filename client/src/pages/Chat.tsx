@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useThemeContext } from '../hooks/useThemeContext';
+import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 import Assistant3DCard from '../components/chat-components/Assistant3DCard';

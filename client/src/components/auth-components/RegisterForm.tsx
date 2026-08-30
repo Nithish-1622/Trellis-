@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useThemeContext } from '../../contexts/ThemeContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useThemeContext } from '../../hooks/useThemeContext';
+import { useAuth } from '../../hooks/useAuth';
 
 const RegisterForm: React.FC = () => {
     const navigate = useNavigate();

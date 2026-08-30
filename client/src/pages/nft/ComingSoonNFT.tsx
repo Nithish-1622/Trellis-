@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useThemeContext } from '../../contexts/ThemeContext';
+import { useThemeContext } from '../../hooks/useThemeContext';
 import { Link } from 'react-router-dom';
 
 import BackgroundGradients from '../../components/landing-page-components/BackgroundGradients';

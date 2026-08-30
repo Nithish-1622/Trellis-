@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useThemeContext } from '../hooks/useThemeContext';
+import { useAuth } from '../hooks/useAuth';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 import { Link } from 'react-router-dom';
 import Jobs3DVisual from '../components/jobs-components/Jobs3DVisual';

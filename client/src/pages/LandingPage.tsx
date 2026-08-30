@@ -1,5 +1,5 @@
 import React from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
+import { useThemeContext } from '../hooks/useThemeContext';
 import Navbar from '../components/landing-page-components/Navbar';
 import Hero from '../components/landing-page-components/Hero';
 

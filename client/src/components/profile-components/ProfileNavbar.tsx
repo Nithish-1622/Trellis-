@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import ThemeToggle from '../landing-page-components/ThemeToggle';
 import trellisLogo from '../../assets/trellis.png';
 

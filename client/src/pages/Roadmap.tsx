@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useThemeContext } from '../hooks/useThemeContext';
+import { useAuth } from '../hooks/useAuth';
 import RoadmapNavbar from '../components/roadmap-components/RoadmapNavbar';
 import Roadmap3D from '../components/roadmap-components/Roadmap3D';
 import RoadmapPath from '../components/roadmap-components/RoadmapPath';
