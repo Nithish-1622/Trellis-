@@ -1,5 +1,6 @@
 """Authenticated history import and resume-evidence endpoints."""
 
+import math
 from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
@@ -25,6 +26,10 @@ MAX_RESUME_BYTES = 5_000_000
 ALLOWED_RESUME_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+RESUME_FILE_SIGNATURES = {
+    "application/pdf": b"%PDF-",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": b"PK\x03\x04",
 }
 
 
@@ -150,11 +155,23 @@ async def parse_resume_evidence(
     content = await file.read(MAX_RESUME_BYTES + 1)
     if len(content) > MAX_RESUME_BYTES:
         raise APIError(status_code=413, code="UPLOAD_TOO_LARGE", message="Resume files must be 5 MB or smaller")
+    expected_signature = RESUME_FILE_SIGNATURES[file.content_type]
+    if not content.startswith(expected_signature):
+        raise APIError(
+            status_code=415,
+            code="UPLOAD_CONTENT_INVALID",
+            message="The file content does not match the declared resume type",
+        )
 
     parsed = await parser.parse_resume(content, file.content_type or "")
     experience_years = parsed.get("experience_years")
     try:
-        experience_years = min(max(float(experience_years), 0), 80) if experience_years is not None else None
+        numeric_experience = float(experience_years) if experience_years is not None else None
+        experience_years = (
+            min(max(numeric_experience, 0), 80)
+            if numeric_experience is not None and math.isfinite(numeric_experience)
+            else None
+        )
     except (TypeError, ValueError):
         experience_years = None
     return ResumeCapabilitiesResponse(

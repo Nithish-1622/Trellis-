@@ -176,3 +176,38 @@ def test_resume_parse_returns_editable_capabilities_without_persisting_claims(hi
     }
     assert db.query(LearnerSkill).count() == 0
     assert db.query(SkillEvidence).count() == 0
+
+
+def test_resume_parse_rejects_content_that_does_not_match_the_declared_type(history_client):
+    client, _db, _identity = history_client
+
+    response = client.post(
+        "/v1/me/resume/parse",
+        files={"file": ("resume.pdf", BytesIO(b"not-a-pdf"), "application/pdf")},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["error"]["code"] == "UPLOAD_CONTENT_INVALID"
+
+
+def test_resume_parse_normalizes_untrusted_model_values(history_client):
+    client, _db, _identity = history_client
+
+    class StubResumeParser:
+        async def parse_resume(self, _content: bytes, _content_type: str):
+            return {
+                "experience_years": "nan",
+                "skills": [{"name": "Python", "proficiency": "principal"}],
+            }
+
+    from learning_history_api import get_resume_parser
+
+    app.dependency_overrides[get_resume_parser] = lambda: StubResumeParser()
+    response = client.post(
+        "/v1/me/resume/parse",
+        files={"file": ("resume.pdf", BytesIO(b"%PDF-test"), "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["experience_years"] is None
+    assert response.json()["skills"][0]["proficiency"] == "beginner"
