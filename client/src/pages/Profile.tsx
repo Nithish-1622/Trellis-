@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import ThemeToggle from '../components/landing-page-components/ThemeToggle'
-import trellisLogo from '../assets/trellis.png'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { useThemeContext } from '../hooks/useThemeContext'
 import { getDashboard } from '../services/dashboardService'
 import type { DashboardData } from '../services/dashboardService'
 
 const formatDate = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 
 export default function Profile() {
-  const { user, logout } = useAuth()
-  const { darkMode, toggleTheme } = useThemeContext()
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,15 +21,7 @@ export default function Profile() {
 
   useEffect(() => { void load() }, [])
 
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login')
-  }
-
-  return <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-100">
-    <header className="border-b border-zinc-200 bg-white/90 dark:border-zinc-800 dark:bg-zinc-950/90">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6"><Link to="/profile" className="flex items-center gap-2 rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500"><img src={trellisLogo} alt="" className="h-8 w-auto" /><span className="text-lg font-bold">Trellis</span></Link><nav aria-label="Primary" className="flex items-center gap-1 sm:gap-3"><Link to="/roadmap" className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800">Roadmap</Link><Link to="/chat" className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800">Assistant</Link><Link to="/practice" className="hidden rounded-lg px-3 py-2 text-sm font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 sm:block">Practice</Link><ThemeToggle darkMode={darkMode} toggleTheme={toggleTheme} /><button type="button" onClick={() => void handleLogout()} className="rounded-lg px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">Log out</button></nav></div>
-    </header>
+  return <div>
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-zinc-500">Welcome back{user?.name ? `, ${user.name}` : ''}</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Your learning dashboard</h1></div><Link to="/onboarding?edit=1" className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-900">Edit learning profile</Link></div>
       {error && <div role="alert" className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">{error} <button type="button" onClick={() => void load()} className="font-semibold underline">Try again</button></div>}

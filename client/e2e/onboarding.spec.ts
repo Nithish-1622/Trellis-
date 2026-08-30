@@ -59,6 +59,12 @@ test('onboarding is usable on a mobile viewport and keeps focus in the current s
   await expect(heading).toBeVisible()
   await expect(heading).toBeFocused()
 
+  const menuButton = page.getByRole('button', { name: 'Open navigation menu' })
+  await menuButton.click()
+  await expect(page.getByRole('navigation', { name: 'Mobile' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close navigation menu' }).click()
+
   await page.getByLabel('What do you want to achieve?').fill(
     'I want to become a backend engineer within twelve months.',
   )

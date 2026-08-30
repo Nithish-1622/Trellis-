@@ -92,10 +92,10 @@ const InterviewPrep: React.FC = () => {
     };
 
     return (
-        <div className={`min-h-screen font-sans relative flex flex-col ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
+        <div className="relative flex flex-col font-sans">
             <BackgroundGradients />
 
-            <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-24 relative z-10">
+            <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-4 py-12">
                 {/* Header */}
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">

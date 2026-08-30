@@ -14,6 +14,7 @@ import AdminCatalog from './pages/AdminCatalog';
 
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth-components/ProtectedRoute';
+import AppShell from './components/app-shell/AppShell';
 
 function App() {
   return (
@@ -24,13 +25,15 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/roadmap" element={<Roadmap />} />
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/practice" element={<InterviewPrep />} />
-            <Route path="/admin/resources" element={<AdminCatalog />} />
+            <Route element={<AppShell />}>
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/roadmap" element={<Roadmap />} />
+              <Route path="/jobs" element={<Jobs />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/practice" element={<InterviewPrep />} />
+              <Route path="/admin/resources" element={<AdminCatalog />} />
+            </Route>
           </Route>
         </Routes>
       </AuthProvider>

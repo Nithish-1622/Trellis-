@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../services/apiClient'
 import { completeMilestone, createRoadmap, getCurrentRoadmap, updateMilestoneProgress } from '../services/roadmapService'
 import type { LearningRoadmap, RoadmapMilestone } from '../services/roadmapService'
-import { useThemeContext } from '../hooks/useThemeContext'
-import RoadmapNavbar from '../components/roadmap-components/RoadmapNavbar'
 import AssessmentPanel from '../components/roadmap-components/AssessmentPanel'
 import AdaptationProposalPanel from '../components/roadmap-components/AdaptationProposalPanel'
 import { createAdaptation, getPendingAdaptation } from '../services/adaptationService'
@@ -15,7 +13,6 @@ const formatDate = (value: string | null) => value
   : 'Flexible'
 
 export default function Roadmap() {
-  const { darkMode, toggleTheme } = useThemeContext()
   const [roadmap, setRoadmap] = useState<LearningRoadmap | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -108,9 +105,8 @@ export default function Roadmap() {
     }
   }
 
-  return <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-100">
-    <RoadmapNavbar darkMode={darkMode} toggleTheme={toggleTheme} targetRole={roadmap?.target_role} />
-    <main className="mx-auto max-w-5xl px-4 pb-20 pt-28 sm:px-6">
+  return <div>
+    <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       {error && <div role="alert" className="mb-6 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"><span>{error}</span><button type="button" className="font-semibold underline" onClick={() => setError(null)}>Dismiss</button></div>}
 
       {isLoading ? <div aria-busy="true" aria-label="Loading roadmap" className="space-y-4"><div className="h-10 w-2/3 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" /><div className="h-48 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" /></div>
