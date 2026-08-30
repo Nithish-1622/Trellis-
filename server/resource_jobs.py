@@ -350,21 +350,26 @@ class ResourceDiscoveryService:
         return resource
 
     def _persist_evaluation(self, resource: LearningResource, skill_id: str, evaluation: EvaluationResult) -> None:
-        self.db.add(ResourceEvaluation(
-            id=str(uuid.uuid4()), resource_id=resource.id, evaluation_version=evaluation.score_version,
-            relevance_score=evaluation.relevance_score, content_quality_score=evaluation.content_quality_score,
-            engagement_score=evaluation.engagement_score, creator_score=evaluation.creator_score,
-            freshness_score=evaluation.freshness_score, final_score=evaluation.final_score,
-            confidence=evaluation.confidence, model_version=evaluation.model_version,
-            input_fingerprint=evaluation.input_fingerprint,
-            evidence={
-                **evaluation.evidence, "coverage": evaluation.coverage,
-                "transcript_available": evaluation.transcript_available,
-                "transcript_language": evaluation.transcript_language,
-                "transcript_content_hash": evaluation.transcript_content_hash,
-            },
-            evaluated_at=datetime.utcnow(),
-        ))
+        stored = self.db.query(ResourceEvaluation).filter_by(
+            resource_id=resource.id, input_fingerprint=evaluation.input_fingerprint,
+        ).first()
+        if stored is None:
+            stored = ResourceEvaluation(
+                id=str(uuid.uuid4()), resource_id=resource.id, evaluation_version=evaluation.score_version,
+                relevance_score=evaluation.relevance_score, content_quality_score=evaluation.content_quality_score,
+                engagement_score=evaluation.engagement_score, creator_score=evaluation.creator_score,
+                freshness_score=evaluation.freshness_score, final_score=evaluation.final_score,
+                confidence=evaluation.confidence, model_version=evaluation.model_version,
+                input_fingerprint=evaluation.input_fingerprint,
+                evidence={
+                    **evaluation.evidence, "coverage": evaluation.coverage,
+                    "transcript_available": evaluation.transcript_available,
+                    "transcript_language": evaluation.transcript_language,
+                    "transcript_content_hash": evaluation.transcript_content_hash,
+                },
+                evaluated_at=datetime.utcnow(),
+            )
+            self.db.add(stored)
         mapping = self.db.query(ResourceSkillMap).filter_by(resource_id=resource.id, skill_id=skill_id).first()
         if mapping is None:
             mapping = ResourceSkillMap(id=str(uuid.uuid4()), resource_id=resource.id, skill_id=skill_id)
@@ -372,11 +377,20 @@ class ResourceDiscoveryService:
         mapping.relevance_score = evaluation.relevance_score
         mapping.evidence = {"score_version": evaluation.score_version, "coverage": evaluation.coverage}
         mapping.updated_at = datetime.utcnow()
+        self.db.flush()
+        evaluations = self.db.query(ResourceEvaluation).filter_by(resource_id=resource.id).all()
+        selected = max(evaluations, key=lambda item: item.final_score * (0.7 + 0.3 * item.confidence))
+        safety_failed = any(bool((item.evidence or {}).get("safety_failure")) for item in evaluations)
         if resource.verification_status != "verified":
-            resource.verification_status = evaluation.status
-        resource.resource_score = evaluation.final_score
-        resource.score_confidence = evaluation.confidence
-        resource.score_version = evaluation.score_version
+            if safety_failed or selected.final_score < settings.RESOURCE_DISCOVERED_SCORE_THRESHOLD:
+                resource.verification_status = "rejected"
+            elif selected.final_score >= settings.RESOURCE_VETTED_SCORE_THRESHOLD and selected.confidence >= settings.RESOURCE_MIN_CONFIDENCE:
+                resource.verification_status = "vetted"
+            else:
+                resource.verification_status = "discovered"
+        resource.resource_score = selected.final_score
+        resource.score_confidence = selected.confidence
+        resource.score_version = selected.evaluation_version
         resource.last_evaluated_at = datetime.utcnow()
         self.db.flush()
 

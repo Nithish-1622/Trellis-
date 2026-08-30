@@ -282,7 +282,10 @@ class ResourceSkillMap(Base):
 class ResourceEvaluation(Base):
     """Immutable, versioned evidence for an automated resource score."""
     __tablename__ = "resource_evaluations"
-    __table_args__ = (Index("ix_resource_evaluations_resource_time", "resource_id", "evaluated_at"),)
+    __table_args__ = (
+        UniqueConstraint("resource_id", "input_fingerprint", name="uq_resource_evaluation_fingerprint"),
+        Index("ix_resource_evaluations_resource_time", "resource_id", "evaluated_at"),
+    )
 
     id = Column(String, primary_key=True)
     resource_id = Column(String, ForeignKey("learning_resources.id", ondelete="CASCADE"), nullable=False)

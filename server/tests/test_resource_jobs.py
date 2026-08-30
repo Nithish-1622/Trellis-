@@ -144,7 +144,8 @@ async def test_discovery_searches_only_gaps_and_persists_vetted_evidence(job_db)
     job_service = ResourceJobService(db)
     job = job_service.enqueue_discovery(profile.user_id, profile.profile_version)
     claimed = job_service.claim_next("worker-a")
-    await ResourceDiscoveryService(db, Provider(), Vetter()).run(claimed)
+    discovery = ResourceDiscoveryService(db, Provider(), Vetter())
+    await discovery.run(claimed)
 
     db.refresh(job)
     indexed = db.query(LearningResource).filter_by(canonical_key="youtube:video-1").one()
@@ -154,6 +155,20 @@ async def test_discovery_searches_only_gaps_and_persists_vetted_evidence(job_db)
     assert indexed.resource_score == 87
     assert db.query(ResourceEvaluation).filter_by(resource_id=indexed.id).count() == 1
     assert db.query(ResourceSkillMap).filter_by(resource_id=indexed.id, skill_id=requirements[1].skill_id).one().relevance_score == 92
+
+    weaker = EvaluationResult(
+        relevance_score=65, content_quality_score=60, engagement_score=50, creator_score=55,
+        freshness_score=60, final_score=59, confidence=.8, status="rejected", model_version="test-model",
+        input_fingerprint="different-fingerprint", transcript_available=False,
+        coverage=[requirements[1].skill.display_name], evidence={},
+    )
+    discovery._persist_evaluation(indexed, requirements[1].skill_id, weaker)
+    discovery._persist_evaluation(indexed, requirements[1].skill_id, weaker)
+    db.commit()
+    db.refresh(indexed)
+    assert indexed.verification_status == "vetted"
+    assert indexed.resource_score == 87
+    assert db.query(ResourceEvaluation).filter_by(resource_id=indexed.id).count() == 2
 
 
 @pytest.mark.asyncio
