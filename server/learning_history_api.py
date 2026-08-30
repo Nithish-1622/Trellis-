@@ -64,10 +64,10 @@ def create_learning_history(
 
 async def _read_csv(file: UploadFile) -> bytes:
     if file.content_type not in {"text/csv", "application/csv", "application/vnd.ms-excel"}:
-        raise APIError(415, "UPLOAD_TYPE_INVALID", "Upload a CSV file")
+        raise APIError(status_code=415, code="UPLOAD_TYPE_INVALID", message="Upload a CSV file")
     content = await file.read(MAX_CSV_BYTES + 1)
     if len(content) > MAX_CSV_BYTES:
-        raise APIError(413, "UPLOAD_TOO_LARGE", "CSV files must be 1 MB or smaller")
+        raise APIError(status_code=413, code="UPLOAD_TOO_LARGE", message="CSV files must be 1 MB or smaller")
     return content
 
 
@@ -99,10 +99,10 @@ async def parse_resume_evidence(
     resume_file_id: Annotated[str | None, Form()] = None,
 ) -> ResumeEvidenceResponse:
     if file.content_type not in ALLOWED_RESUME_TYPES:
-        raise APIError(415, "UPLOAD_TYPE_INVALID", "Upload a PDF or DOCX resume")
+        raise APIError(status_code=415, code="UPLOAD_TYPE_INVALID", message="Upload a PDF or DOCX resume")
     content = await file.read(MAX_RESUME_BYTES + 1)
     if len(content) > MAX_RESUME_BYTES:
-        raise APIError(413, "UPLOAD_TOO_LARGE", "Resume files must be 5 MB or smaller")
+        raise APIError(status_code=413, code="UPLOAD_TOO_LARGE", message="Resume files must be 5 MB or smaller")
 
     parsed = await parser.parse_resume(content, file.content_type or "")
     skills = [str(skill).strip() for skill in parsed.get("skills", []) if str(skill).strip()][:100]

@@ -115,6 +115,18 @@ def test_csv_partial_import_persists_only_valid_unique_rows(history_client):
     assert db.query(LearningHistory).count() == 1
 
 
+def test_history_upload_rejects_wrong_media_type_with_error_envelope(history_client):
+    client, _db, _identity = history_client
+
+    response = client.post(
+        "/v1/me/learning-history/csv/preview",
+        files={"file": ("history.txt", BytesIO(b"title\nCourse"), "text/plain")},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["error"]["code"] == "UPLOAD_TYPE_INVALID"
+
+
 def test_resume_skills_add_evidence_without_downgrading_existing_skill(history_client):
     client, db, _identity = history_client
     onboarding = {

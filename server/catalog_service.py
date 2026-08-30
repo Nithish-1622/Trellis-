@@ -44,7 +44,7 @@ class CatalogService:
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
-            raise APIError(409, "RESOURCE_DUPLICATE", "This provider resource already exists") from exc
+            raise APIError(status_code=409, code="RESOURCE_DUPLICATE", message="This provider resource already exists") from exc
         self.db.refresh(resource)
         return ResourceResponse.model_validate(resource)
 
@@ -173,7 +173,7 @@ class CatalogService:
     def _get(self, resource_id: str) -> LearningResource:
         resource = self.db.get(LearningResource, resource_id)
         if resource is None:
-            raise APIError(404, "RESOURCE_NOT_FOUND", "Learning resource was not found")
+            raise APIError(status_code=404, code="RESOURCE_NOT_FOUND", message="Learning resource was not found")
         return resource
 
     @staticmethod

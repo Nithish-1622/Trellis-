@@ -115,6 +115,15 @@ def test_catalog_rejects_non_http_resource_urls(catalog_client):
     assert response.status_code == 422
 
 
+def test_missing_catalog_resource_uses_structured_error(catalog_client):
+    client, _db, _identity = catalog_client
+
+    response = client.delete("/v1/admin/resources/missing")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
+
+
 def test_recommendations_merge_validated_live_resources_and_keep_catalog_fallback(catalog_client):
     client, _db, identity = catalog_client
     assert client.post("/v1/admin/resources", json=resource_payload()).status_code == 201

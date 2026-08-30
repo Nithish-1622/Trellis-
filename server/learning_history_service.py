@@ -115,16 +115,16 @@ class LearningHistoryService:
 
     def _parse_csv(self, user_id: str, content: bytes) -> list[CsvPreviewRow]:
         if len(content) > MAX_CSV_BYTES:
-            raise APIError(413, "UPLOAD_TOO_LARGE", "CSV files must be 1 MB or smaller")
+            raise APIError(status_code=413, code="UPLOAD_TOO_LARGE", message="CSV files must be 1 MB or smaller")
         try:
             text = content.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
-            raise APIError(422, "CSV_ENCODING_INVALID", "CSV files must use UTF-8 encoding") from exc
+            raise APIError(status_code=422, code="CSV_ENCODING_INVALID", message="CSV files must use UTF-8 encoding") from exc
 
         reader = csv.DictReader(StringIO(text))
         required_headers = {"title"}
         if not reader.fieldnames or not required_headers.issubset({name.strip() for name in reader.fieldnames}):
-            raise APIError(422, "CSV_HEADERS_INVALID", "CSV must include a title header")
+            raise APIError(status_code=422, code="CSV_HEADERS_INVALID", message="CSV must include a title header")
 
         existing_keys = {
             self._course_key(item.title, item.provider)
@@ -134,7 +134,7 @@ class LearningHistoryService:
         preview: list[CsvPreviewRow] = []
         for index, raw in enumerate(reader, start=2):
             if index - 1 > MAX_CSV_ROWS:
-                raise APIError(413, "CSV_TOO_MANY_ROWS", "CSV files may contain at most 500 data rows")
+                raise APIError(status_code=413, code="CSV_TOO_MANY_ROWS", message="CSV files may contain at most 500 data rows")
             course, errors = self._parse_row(raw)
             status = "invalid" if errors else "ready"
             if course is not None and not errors:
