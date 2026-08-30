@@ -2,10 +2,12 @@ from datetime import datetime, timezone
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from resource_providers import (
     GitHubProvider,
     HybridResourceProvider,
+    ExternalResource,
     ProviderSearchRequest,
     YouTubeProvider,
     canonical_resource_key,
@@ -16,6 +18,22 @@ def test_canonical_resource_keys_collapse_provider_url_variants():
     assert canonical_resource_key("youtube", "abc123", "https://youtu.be/abc123") == "youtube:abc123"
     assert canonical_resource_key("youtube", None, "https://www.youtube.com/embed/abc123") == "youtube:abc123"
     assert canonical_resource_key("github", None, "https://github.com/Example/Project.git") == "github:example/project"
+
+
+def test_external_resource_rejects_untrusted_or_mismatched_canonical_identity():
+    with pytest.raises(ValueError):
+        canonical_resource_key("youtube", "abc123", "https://attacker.example/watch?v=abc123")
+    with pytest.raises(ValueError):
+        canonical_resource_key("youtube", "abc123", "https://youtu.be/different")
+    with pytest.raises(ValidationError):
+        ExternalResource(
+            provider="youtube",
+            external_id="abc123",
+            canonical_key="youtube:trusted-video",
+            resource_type="video",
+            title="Untrusted overwrite",
+            url="https://youtu.be/abc123",
+        )
 
 
 @pytest.mark.asyncio
@@ -80,7 +98,7 @@ async def test_github_provider_rejects_archived_empty_and_readme_less_repositori
                 {"id": 13, "full_name": "example/no-readme", "html_url": "https://github.com/example/no-readme", "archived": False, "disabled": False, "size": 50},
             ]})
         if request.url.path == "/repos/example/good/readme":
-            return httpx.Response(200, json={"content": "IyBHb29kIHByb2plY3Q=", "encoding": "base64"})
+            return httpx.Response(200, json={"content": "IyBHb29k\nIHByb2plY3Q=", "encoding": "base64"})
         if request.url.path == "/repos/example/good/languages":
             return httpx.Response(200, json={"Java": 1000})
         if request.url.path == "/repos/example/no-readme/readme":
@@ -95,6 +113,31 @@ async def test_github_provider_rejects_archived_empty_and_readme_less_repositori
     assert results[0].metadata["readme"] == "# Good project"
     assert results[0].metadata["has_license"] is False
     assert results[0].metrics.stars == 400
+    assert results[0].published_at == datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_hybrid_provider_interleaves_results_from_each_provider():
+    class Provider:
+        def __init__(self, provider: str) -> None:
+            self.provider = provider
+
+        async def search(self, _request, _limit):
+            return [
+                ExternalResource(
+                    provider=self.provider,
+                    external_id=f"{self.provider}-{index}",
+                    resource_type="article",
+                    title=f"{self.provider}-{index}",
+                    url=f"https://resources.example/{self.provider}-{index}",
+                )
+                for index in range(2)
+            ]
+
+    hybrid = HybridResourceProvider([Provider("catalog-a"), Provider("catalog-b")])
+    results = await hybrid.search(ProviderSearchRequest(skill="backend engineering"), 2)
+
+    assert [resource.provider for resource in results] == ["catalog-a", "catalog-b"]
 
 
 @pytest.mark.asyncio

@@ -69,8 +69,10 @@ class ExternalResource(BaseModel):
 
     @model_validator(mode="after")
     def populate_canonical_key(self) -> "ExternalResource":
-        if not self.canonical_key:
-            self.canonical_key = canonical_resource_key(self.provider, self.external_id, str(self.url))
+        derived_key = canonical_resource_key(self.provider, self.external_id, str(self.url))
+        if self.canonical_key and self.canonical_key != derived_key:
+            raise ValueError("Canonical identity does not match provider resource URL")
+        self.canonical_key = derived_key
         return self
 
 
@@ -79,20 +81,29 @@ def canonical_resource_key(provider: str, external_id: str | None, url: str) -> 
     parsed = urlsplit(url)
     hostname = (parsed.hostname or "").casefold()
     if source == "youtube":
-        video_id = external_id
-        if not video_id and hostname in {"youtu.be", "www.youtu.be"}:
-            video_id = parsed.path.strip("/").split("/")[0]
-        if not video_id and hostname in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+        if hostname not in {"youtu.be", "www.youtu.be", "youtube.com", "www.youtube.com", "m.youtube.com"}:
+            raise ValueError("YouTube resources must use a YouTube URL")
+        url_video_id = None
+        if hostname in {"youtu.be", "www.youtu.be"}:
+            url_video_id = parsed.path.strip("/").split("/")[0]
+        else:
             if parsed.path == "/watch":
-                video_id = parse_qs(parsed.query).get("v", [None])[0]
+                url_video_id = parse_qs(parsed.query).get("v", [None])[0]
             elif parsed.path.startswith(("/embed/", "/shorts/")):
-                video_id = parsed.path.split("/")[2]
-        if video_id:
-            return f"youtube:{video_id}"
-    if source == "github" and hostname in {"github.com", "www.github.com"}:
+                url_video_id = parsed.path.split("/")[2]
+        if not url_video_id or (external_id and external_id != url_video_id):
+            raise ValueError("YouTube external identity does not match its URL")
+        return f"youtube:{url_video_id}"
+    if source == "github":
+        if hostname not in {"github.com", "www.github.com"}:
+            raise ValueError("GitHub resources must use a GitHub URL")
         parts = [part for part in parsed.path.split("/") if part]
         if len(parts) >= 2:
-            return f"github:{parts[0].casefold()}/{parts[1].removesuffix('.git').casefold()}"
+            repository = f"{parts[0].casefold()}/{parts[1].removesuffix('.git').casefold()}"
+            if external_id and external_id.strip().removesuffix(".git").casefold() != repository:
+                raise ValueError("GitHub external identity does not match its URL")
+            return f"github:{repository}"
+        raise ValueError("GitHub resource URL must identify a repository")
     if not external_id:
         raise ValueError("Provider resource requires a canonical external identity")
     return f"{source}:{external_id.strip().casefold()}"
@@ -269,7 +280,8 @@ class GitHubProvider:
         if readme_payload.get("encoding") != "base64" or not readme_payload.get("content"):
             return None
         try:
-            readme = base64.b64decode(readme_payload["content"], validate=True).decode("utf-8", errors="replace")[:20_000]
+            encoded_readme = "".join(str(readme_payload["content"]).split())
+            readme = base64.b64decode(encoded_readme, validate=True).decode("utf-8", errors="replace")[:20_000]
         except (ValueError, TypeError):
             return None
         if not readme.strip():
@@ -284,7 +296,7 @@ class GitHubProvider:
             provider="github", external_id=repository.full_name.casefold(),
             canonical_key=canonical_resource_key("github", None, str(repository.html_url)), resource_type="project",
             title=repository.full_name, description=repository.description, url=repository.html_url, author=repository.full_name.split("/", 1)[0],
-            published_at=repository.created_at, topics=topics, language=request.language,
+            published_at=repository.pushed_at or repository.created_at, topics=topics, language=request.language,
             metrics=ResourceMetrics(stars=repository.stargazers_count, forks=repository.forks_count),
             creator_metrics=CreatorMetrics(created_at=repository.created_at),
             metadata={"readme": readme, "languages": languages, "last_activity_at": repository.pushed_at.isoformat() if repository.pushed_at else None, "has_license": repository.license is not None, "validation": "github-repository/v1"},
@@ -296,6 +308,7 @@ class HybridResourceProvider:
         self.providers = providers
         self.ttl_seconds = ttl_seconds
         self._cache: dict[tuple[str, int], tuple[float, list[ExternalResource]]] = {}
+        self._failures: dict[int, tuple[int, float]] = {}
         self._lock = asyncio.Lock()
 
     async def search(self, request: ProviderSearchRequest | str, limit: int) -> list[ExternalResource]:
@@ -311,23 +324,35 @@ class HybridResourceProvider:
                 return cached[1]
             groups = await asyncio.gather(*(self._safe_search(provider, search_request, bounded_limit) for provider in self.providers))
             deduplicated: dict[str, ExternalResource] = {}
-            for item in (item for group in groups for item in group):
-                deduplicated.setdefault(item.canonical_key, item)
+            for index in range(max((len(group) for group in groups), default=0)):
+                for group in groups:
+                    if index < len(group):
+                        item = group[index]
+                        deduplicated.setdefault(item.canonical_key, item)
             results = list(deduplicated.values())[:bounded_limit]
             self._cache[cache_key] = (time.monotonic() + self.ttl_seconds, results)
             return results
 
-    @staticmethod
-    async def _safe_search(provider: ResourceProvider, request: ProviderSearchRequest, limit: int) -> list[ExternalResource]:
+    async def _safe_search(self, provider: ResourceProvider, request: ProviderSearchRequest, limit: int) -> list[ExternalResource]:
         provider_name = provider.__class__.__name__.removesuffix("Provider").casefold()
         started = time.perf_counter()
+        provider_key = id(provider)
+        failure_count, open_until = self._failures.get(provider_key, (0, 0.0))
+        if open_until > time.monotonic():
+            return []
         for attempt in range(2):
             try:
                 results = await provider.search(request, limit)
+                self._failures.pop(provider_key, None)
                 metrics.observe(f"provider.{provider_name}", (time.perf_counter() - started) * 1000)
                 return results
-            except (httpx.HTTPError, ValidationError, ValueError) as exc:
+            except (httpx.HTTPError, ValidationError, ValueError, TypeError, AttributeError) as exc:
                 if attempt == 1:
+                    failure_count += 1
+                    open_until = 0.0
+                    if failure_count >= settings.PROVIDER_CIRCUIT_BREAKER_FAILURES:
+                        open_until = time.monotonic() + settings.PROVIDER_CIRCUIT_BREAKER_SECONDS
+                    self._failures[provider_key] = (failure_count, open_until)
                     logger.warning("Resource provider failed: %s", type(exc).__name__)
                     metrics.observe(f"provider.{provider_name}", (time.perf_counter() - started) * 1000, failed=True)
         return []
