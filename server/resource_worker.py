@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import socket
+import time
 import uuid
 
 from config import settings
@@ -48,7 +49,15 @@ async def run_once(worker_id: str) -> bool:
 async def run_forever() -> None:
     worker_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
     logger.info("Starting Trellis resource worker %s", worker_id)
+    next_schedule_at = 0.0
     while True:
+        if time.monotonic() >= next_schedule_at:
+            db = SessionLocal()
+            try:
+                ResourceJobService(db).schedule_recurring()
+            finally:
+                db.close()
+            next_schedule_at = time.monotonic() + settings.RESOURCE_SCHEDULER_INTERVAL_SECONDS
         worked = await run_once(worker_id)
         if not worked:
             await asyncio.sleep(settings.RESOURCE_WORKER_POLL_SECONDS)

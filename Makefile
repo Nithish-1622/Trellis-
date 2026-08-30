@@ -2,7 +2,7 @@ COMPOSE := docker compose
 DEV_COMPOSE := $(COMPOSE) -f compose.yaml -f compose.dev.yaml
 
 .DEFAULT_GOAL := help
-.PHONY: help prod dev build dev-build down dev-down logs dev-logs ps dev-ps config test test-api test-client lint e2e migrate migration-current destroy dev-destroy
+.PHONY: help prod dev build dev-build down dev-down logs dev-logs worker-logs dev-worker-logs ps dev-ps config test test-api test-client lint e2e migrate migration-current destroy dev-destroy
 
 help:
 	@echo "Trellis Docker commands:"
@@ -12,6 +12,8 @@ help:
 	@echo "  make dev-down   Stop the development stack"
 	@echo "  make logs       Follow production logs"
 	@echo "  make dev-logs   Follow development logs"
+	@echo "  make worker-logs Follow production resource worker logs"
+	@echo "  make dev-worker-logs Follow development resource worker logs"
 	@echo "  make ps         Show production service status"
 	@echo "  make dev-ps     Show development service status"
 	@echo "  make build      Build production images"
@@ -72,6 +74,12 @@ logs:
 
 dev-logs:
 	$(DEV_COMPOSE) logs -f
+
+worker-logs:
+	$(COMPOSE) logs -f worker
+
+dev-worker-logs:
+	$(DEV_COMPOSE) logs -f worker
 
 ps:
 	$(COMPOSE) ps

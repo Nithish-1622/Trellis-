@@ -39,6 +39,24 @@ services:
       retries: 3
       start_period: 15s
 
+  worker:
+    build:
+      context: ./server
+      target: production
+    command: ["python", "-m", "resource_worker"]
+    env_file:
+      - ./server/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mypassword}@db:5432/${POSTGRES_DB:-career_mentor_db}
+      ENVIRONMENT: production
+      DEBUG: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: pgvector/pgvector:pg17
     environment:

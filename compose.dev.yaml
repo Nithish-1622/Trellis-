@@ -25,6 +25,16 @@ services:
       - ./server:/app
     restart: "no"
 
+  worker:
+    build:
+      target: development
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+    volumes:
+      - ./server:/app
+    restart: "no"
+
   db:
     ports:
       - "5432:5432"

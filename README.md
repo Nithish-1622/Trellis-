@@ -1,18 +1,19 @@
 # Trellis
 
-Trellis is a pilot-ready personalized learning platform. Learners describe a goal, confirm a structured profile, import prior learning, and receive an evidence-driven roadmap made from verified catalog resources and validated live provider results.
+Trellis is a pilot-ready personalized learning platform. Learners describe a goal, confirm a structured profile, import prior learning, and receive an evidence-driven roadmap from Trellis's verified and automatically vetted resource index.
 
 ## What is included
 
 - Resumable hybrid onboarding with natural-language goal analysis and explicit review.
 - Normalized learner profiles, skills, history, assessments, and weighted evidence.
 - Prerequisite-aware, scheduled, versioned learning roadmaps.
-- Verified course catalog plus live YouTube and GitHub supplemental resources.
+- Layered verified catalog plus automatically vetted YouTube and GitHub resources.
 - Progress, milestones, deterministic quizzes, provisional project rubrics, and dashboard insights.
 - Learner-approved roadmap adaptation that preserves completed work and prior versions.
 - Contextual assistant actions that cannot silently mutate a roadmap.
 - Persistent interview practice and lower-weight hiring-process evidence.
-- Administrator catalog review, bulk import, provider sync, link checks, and safe metrics.
+- Learner helpfulness/report feedback and exception-focused administrator oversight.
+- A durable PostgreSQL worker for discovery, vetting, reevaluation, and retention cleanup.
 
 Appwrite owns identity and resume object storage. PostgreSQL and Alembic own application data.
 
@@ -26,7 +27,7 @@ cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-Set the same Appwrite project in `server/.env` and `client/.env`. Configure `ADMIN_USER_IDS` with comma-separated Appwrite user IDs. External provider and LLM keys are optional; verified catalog content and deterministic fallbacks remain available without them.
+Set the same Appwrite project in `server/.env` and `client/.env`. Configure `ADMIN_USER_IDS` with comma-separated Appwrite user IDs. YouTube, GitHub, Groq, and the transcript adapter are configured in `server/.env`; provider-independent indexed content and deterministic fallbacks remain available when any integration is unavailable.
 
 Development with live reload:
 
@@ -85,10 +86,12 @@ Primary endpoint groups:
 
 - `/v1/me/*` — onboarding, profile, history, resume evidence, skills, dashboard.
 - `/v1/roadmaps/*` — generation, versions, milestone progress, assessments, adaptations.
-- `/v1/resources/recommendations` — ranked verified and live supplemental resources.
+- `/v1/resources/recommendations` — ranked verified and vetted index resources.
+- `/v1/resources/discover` and `/v1/resources/discovery-jobs/{id}` — idempotent asynchronous coverage discovery.
+- `/v1/resources/{id}/interactions` — privacy-bounded learner feedback.
 - `/v1/chat/messages` — contextual learner assistant.
 - `/v1/career/*` — real job links, applications, and persistent interview evidence.
-- `/v1/admin/resources/*` — administrator catalog workflow.
+- `/v1/admin/resources/*` — catalog management, evaluation history, and exception moderation.
 - `/v1/admin/operations/metrics` — content-free pilot aggregates.
 
 Legacy unversioned agent endpoints have been removed.
@@ -99,6 +102,7 @@ Legacy unversioned agent endpoints have been removed.
 - `/health/ready` verifies database connectivity and is used by Docker health checks.
 - Provider and AI operations have bounded timeouts, retries, user-scoped rate limits, and deterministic/catalog fallbacks.
 - Operational metrics contain counts and latency aggregates only; learner prompts and answers are not recorded.
-- Live resources are validated provider responses. AI can rank and explain them but cannot invent URLs.
+- YouTube and GitHub are discovery backends, not learner-facing databases. Validated candidates are scored and indexed before use, so AI cannot invent resource URLs.
+- The worker is deliberately a second process using the API image; PostgreSQL supplies durable jobs and `SKIP LOCKED` claiming, so no Redis service is required.
 
 Architecture and test details are in [server/docs/ARCHITECTURE.md](server/docs/ARCHITECTURE.md) and [server/docs/TESTING.md](server/docs/TESTING.md).

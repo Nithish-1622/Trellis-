@@ -80,6 +80,16 @@ def test_failed_jobs_retry_with_a_bound_and_remain_inspectable(job_db):
     assert job.last_error_code == "PROVIDER_TIMEOUT"
 
 
+def test_recurring_maintenance_is_deduplicated(job_db):
+    db, _profile = job_db
+    service = ResourceJobService(db)
+
+    service.schedule_recurring()
+    service.schedule_recurring()
+
+    assert db.query(ResourceJob).filter_by(job_type="interaction_cleanup").count() == 1
+
+
 @pytest.mark.asyncio
 async def test_discovery_searches_only_gaps_and_persists_vetted_evidence(job_db):
     db, profile = job_db

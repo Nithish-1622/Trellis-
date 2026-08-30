@@ -7,7 +7,7 @@ import re
 from typing import Protocol
 import uuid
 
-from sqlalchemy import text
+from sqlalchemy import and_, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from database import (
     LearningResource,
     ResourceEvaluation,
     ResourceInteraction,
+    ResourceSignalSummary,
     ResourceJob,
     ResourceSkillMap,
     Skill,
@@ -122,6 +123,34 @@ class ResourceJobService:
         self.db.add(job)
         self.db.commit()
         return job
+
+    def schedule_recurring(self) -> int:
+        """Schedule bounded cleanup and reevaluation work; DB uniqueness prevents duplicates."""
+        now = datetime.utcnow()
+        scheduled = 0
+        cleanup = self.enqueue_scheduled_maintenance(
+            "interaction_cleanup", now.strftime("interaction-cleanup:%Y-%m-%d"), {},
+        )
+        scheduled += int(cleanup is not None and cleanup.status == "queued")
+        candidates = self.db.query(LearningResource).join(
+            ResourceSkillMap, ResourceSkillMap.resource_id == LearningResource.id
+        ).outerjoin(
+            ResourceSignalSummary, ResourceSignalSummary.resource_id == LearningResource.id
+        ).filter(
+            LearningResource.verification_status.in_(["verified", "vetted", "discovered"]),
+            LearningResource.archived_at.is_(None),
+            or_(
+                LearningResource.last_evaluated_at.is_(None),
+                and_(LearningResource.freshness_class == "fast_moving", LearningResource.last_evaluated_at < now - timedelta(days=7)),
+                and_(LearningResource.freshness_class == "moderate", LearningResource.last_evaluated_at < now - timedelta(days=30)),
+                and_(LearningResource.freshness_class == "stable", LearningResource.last_evaluated_at < now - timedelta(days=90)),
+                ResourceSignalSummary.impressions >= 100,
+            ),
+        ).distinct().order_by(LearningResource.last_evaluated_at.asc()).limit(settings.RESOURCE_REEVALUATION_BATCH_SIZE).all()
+        for resource in candidates:
+            job = self.enqueue_evaluation(resource.id, "scheduled_freshness_or_usage")
+            scheduled += int(job.status == "queued")
+        return scheduled
 
 
 class ResourceDiscoveryService:
