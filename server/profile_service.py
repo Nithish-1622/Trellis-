@@ -177,6 +177,8 @@ class LearnerProfileService:
         profile.experience_years = position.experience_years or 0
         profile.education_level = position.education_level
         profile.interests = position.interests
+        profile.resume_filename = position.resume_filename
+        profile.resume_file_id = position.resume_file_id
         profile.preferred_formats = preferences.preferred_formats
         profile.project_theory_balance = preferences.project_theory_balance
         profile.learning_pace = preferences.learning_pace
@@ -190,13 +192,23 @@ class LearnerProfileService:
         self.db.flush()
 
         for skill_draft in position.skills:
-            self._upsert_skill(profile.user_id, skill_draft)
+            skill = self._upsert_skill(profile.user_id, skill_draft)
+            if skill_draft.evidence_source == "resume" and position.resume_file_id:
+                self._upsert_confirmed_resume_evidence(
+                    profile.user_id,
+                    skill,
+                    position.resume_file_id,
+                    skill_draft.evidence_rationale,
+                    position.resume_filename,
+                    position.resume_certifications,
+                    position.resume_projects,
+                )
 
         if draft.previous_learning:
             for course in draft.previous_learning.courses:
                 self._upsert_history(profile.user_id, course.model_dump())
 
-    def _upsert_skill(self, user_id: str, skill_draft) -> None:
+    def _upsert_skill(self, user_id: str, skill_draft) -> Skill:
         skill = self._resolve_skill(skill_draft.name)
         learner_skill = (
             self.db.query(LearnerSkill)
@@ -213,9 +225,10 @@ class LearnerProfileService:
             self.db.add(learner_skill)
         learner_skill.display_name = skill_draft.name.strip()
         learner_skill.proficiency = skill_draft.proficiency
-        learner_skill.confidence = 0.5
+        learner_skill.confidence = 0.55 if skill_draft.evidence_source == "resume" else 0.5
         learner_skill.source = skill_draft.evidence_source
         learner_skill.evidence_url = skill_draft.evidence_url
+        return skill
 
     def _resolve_skill(self, name: str) -> Skill:
         canonical_name = _canonicalize_skill_name(name)
@@ -237,43 +250,41 @@ class LearnerProfileService:
             self.db.flush()
         return skill
 
-    def add_resume_evidence(self, user_id: str, names: list[str]) -> list[str]:
-        added: list[str] = []
-        seen: set[str] = set()
-        for name in names:
-            canonical = _canonicalize_skill_name(name)
-            if not canonical or canonical in seen:
-                continue
-            seen.add(canonical)
-            skill = self._resolve_skill(name)
-            learner_skill = self.db.query(LearnerSkill).filter(
-                LearnerSkill.user_id == user_id,
-                LearnerSkill.skill_id == skill.id,
-            ).first()
-            if learner_skill is None:
-                learner_skill = LearnerSkill(
-                    id=str(uuid.uuid4()),
-                    user_id=user_id,
-                    skill_id=skill.id,
-                    display_name=name.strip(),
-                    proficiency="beginner",
-                    confidence=0.35,
-                    source="resume",
-                )
-                self.db.add(learner_skill)
-                added.append(name.strip())
-            self.db.add(SkillEvidence(
+    def _upsert_confirmed_resume_evidence(
+        self,
+        user_id: str,
+        skill: Skill,
+        resume_file_id: str,
+        rationale: str | None,
+        filename: str | None,
+        certifications: list[str],
+        projects: list[str],
+    ) -> None:
+        evidence = self.db.query(SkillEvidence).filter(
+            SkillEvidence.user_id == user_id,
+            SkillEvidence.skill_id == skill.id,
+            SkillEvidence.source_type == "resume",
+            SkillEvidence.source_id == resume_file_id,
+        ).first()
+        if evidence is None:
+            evidence = SkillEvidence(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 skill_id=skill.id,
-                evidence_type="resume_mention",
+                evidence_type="learner_confirmed_resume_claim",
                 source_type="resume",
-                confidence=0.35,
+                source_id=resume_file_id,
+                confidence=0.55,
                 weight=0.4,
-                rationale="Skill was identified in the learner's uploaded resume.",
-                evidence_metadata={},
-            ))
-        return added
+            )
+            self.db.add(evidence)
+        evidence.rationale = rationale or "The learner confirmed this resume-derived skill during onboarding."
+        evidence.evidence_metadata = {
+            "filename": filename,
+            "certifications": certifications,
+            "projects": projects,
+            "learner_confirmed": True,
+        }
 
     def _upsert_history(self, user_id: str, course: dict) -> None:
         existing = (

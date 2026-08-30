@@ -37,6 +37,7 @@ class SkillDraft(BaseModel):
     proficiency: str = Field(pattern="^(beginner|intermediate|advanced|expert)$")
     evidence_source: str = Field(default="self_reported", max_length=100)
     evidence_url: str | None = Field(default=None, max_length=2000)
+    evidence_rationale: str | None = Field(default=None, max_length=500)
 
 
 class CurrentPositionDraft(BaseModel):
@@ -45,6 +46,10 @@ class CurrentPositionDraft(BaseModel):
     education_level: str | None = Field(default=None, max_length=200)
     interests: list[str] = Field(default_factory=list, max_length=30)
     skills: list[SkillDraft] = Field(default_factory=list, max_length=50)
+    resume_filename: str | None = Field(default=None, max_length=255)
+    resume_file_id: str | None = Field(default=None, max_length=255)
+    resume_certifications: list[str] = Field(default_factory=list, max_length=20)
+    resume_projects: list[str] = Field(default_factory=list, max_length=20)
 
 
 class CompletedCourseDraft(BaseModel):

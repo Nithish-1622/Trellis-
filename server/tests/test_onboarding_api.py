@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
-from database import Base, LearnerSkill, get_db
+from database import Base, LearnerSkill, SkillEvidence, UserProfile, get_db
 from main import app
 from goal_analyzer import get_goal_analyzer
 from profile_schemas import GoalAnalysisResponse
@@ -140,6 +140,36 @@ def test_onboarding_completion_is_idempotent_and_persists_normalized_profile(onb
     assert profile.json()["weekly_hours"] == 8
     assert profile.json()["is_onboarding_complete"] is True
     assert db.query(LearnerSkill).count() == 1
+
+
+def test_confirmed_resume_capabilities_persist_once_with_provenance(onboarding_client):
+    client, db, _identity = onboarding_client
+    payload = onboarding_payload(complete=True)
+    payload["draft"]["current_position"].update({
+        "resume_filename": "resume.pdf",
+        "resume_file_id": "resume-file-1",
+        "resume_certifications": ["AWS Developer Associate"],
+        "resume_projects": ["Payments API"],
+        "skills": [{
+            "name": "Docker",
+            "proficiency": "intermediate",
+            "evidence_source": "resume",
+            "evidence_rationale": "Used to ship the Payments API project.",
+        }],
+    })
+
+    assert client.post("/v1/me/onboarding", json=payload).status_code == 200
+    assert client.post("/v1/me/onboarding", json=payload).status_code == 200
+
+    profile = db.get(UserProfile, "learner-one")
+    skill = db.query(LearnerSkill).one()
+    evidence = db.query(SkillEvidence).one()
+    assert profile.resume_filename == "resume.pdf"
+    assert profile.resume_file_id == "resume-file-1"
+    assert skill.source == "resume"
+    assert skill.proficiency == "intermediate"
+    assert evidence.source_id == "resume-file-1"
+    assert evidence.rationale == "Used to ship the Payments API project."
 
 
 def test_onboarding_rejects_invalid_availability_with_error_envelope(onboarding_client):
