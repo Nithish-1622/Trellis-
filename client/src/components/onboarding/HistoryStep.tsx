@@ -1,5 +1,11 @@
 import { useRef, useState } from 'react'
-import type { CompletedCourseDraft, PreviousLearningDraft } from '../../services/onboardingService'
+import type { PreviousLearningDraft } from '../../services/onboardingService'
+import {
+  importLearningHistoryCsv,
+  previewLearningHistoryCsv,
+  uploadResumeEvidence,
+} from '../../services/learningHistoryService'
+import type { CsvPreview, ResumeEvidence } from '../../services/learningHistoryService'
 import { Field, TextInput } from './fields'
 
 interface HistoryStepProps {
@@ -7,12 +13,16 @@ interface HistoryStepProps {
   onChange: (value: PreviousLearningDraft) => void
 }
 
-const parseCsvLine = (line: string) => line.split(',').map((cell) => cell.trim())
-
 export default function HistoryStep({ value, onChange }: HistoryStepProps) {
   const [title, setTitle] = useState('')
   const [provider, setProvider] = useState('')
   const [csvErrors, setCsvErrors] = useState<string[]>([])
+  const [csvPreview, setCsvPreview] = useState<CsvPreview | null>(null)
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [resumeResult, setResumeResult] = useState<ResumeEvidence | null>(null)
+  const [resumeError, setResumeError] = useState<string | null>(null)
+  const [isParsingResume, setIsParsingResume] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const addCourse = () => {
@@ -22,25 +32,52 @@ export default function HistoryStep({ value, onChange }: HistoryStepProps) {
     setProvider('')
   }
 
-  const importCsv = async (file?: File) => {
+  const previewCsv = async (file?: File) => {
     if (!file) return
-    const lines = (await file.text()).split(/\r?\n/).filter(Boolean)
-    const [header, ...rows] = lines.map(parseCsvLine)
-    if (!header || header[0]?.toLowerCase() !== 'title') {
-      setCsvErrors(['The first column must be named “title”. Download the template and try again.'])
-      return
+    setCsvFile(file)
+    setCsvPreview(null)
+    setCsvErrors([])
+    try {
+      const preview = await previewLearningHistoryCsv(file)
+      setCsvPreview(preview)
+      setCsvErrors(preview.rows.flatMap((row) => row.errors.map((error) => `Row ${row.row_number}: ${error}`)))
+    } catch (error) {
+      setCsvErrors([error instanceof Error ? error.message : 'We could not preview this CSV.'])
     }
-    const imported: CompletedCourseDraft[] = []
-    const errors: string[] = []
-    rows.forEach((row, index) => {
-      if (!row[0]) errors.push(`Row ${index + 2}: title is required.`)
-      else imported.push({ title: row[0], provider: row[1] || null, completion_date: row[2] || null, topics: row[3] ? row[3].split('|').map((item) => item.trim()).filter(Boolean) : [] })
-    })
-    const existing = new Set(value.courses.map((course) => `${course.title}|${course.provider || ''}`.toLowerCase()))
-    const unique = imported.filter((course) => !existing.has(`${course.title}|${course.provider || ''}`.toLowerCase()))
-    onChange({ ...value, courses: [...value.courses, ...unique] })
-    setCsvErrors(errors)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const confirmCsvImport = async () => {
+    if (!csvFile || !csvPreview?.ready_count) return
+    setIsImporting(true)
+    setCsvErrors([])
+    try {
+      await importLearningHistoryCsv(csvFile)
+      const imported = csvPreview.rows.flatMap((row) => row.status === 'ready' && row.course ? [row.course] : [])
+      const existing = new Set(value.courses.map((course) => `${course.title}|${course.provider || ''}`.toLowerCase()))
+      const unique = imported.filter((course) => !existing.has(`${course.title}|${course.provider || ''}`.toLowerCase()))
+      onChange({ ...value, courses: [...value.courses, ...unique] })
+      setCsvPreview(null)
+      setCsvFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } catch (error) {
+      setCsvErrors([error instanceof Error ? error.message : 'We could not import the valid rows.'])
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const parseResume = async (file?: File) => {
+    if (!file) return
+    setIsParsingResume(true)
+    setResumeError(null)
+    setResumeResult(null)
+    try {
+      setResumeResult(await uploadResumeEvidence(file))
+    } catch (error) {
+      setResumeError(error instanceof Error ? error.message : 'We could not process this resume.')
+    } finally {
+      setIsParsingResume(false)
+    }
   }
 
   const downloadTemplate = () => {
@@ -69,8 +106,17 @@ export default function HistoryStep({ value, onChange }: HistoryStepProps) {
           <div><h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Import a CSV</h2><p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">Columns: title, provider, completion_date, topics separated by |</p></div>
           <button type="button" onClick={downloadTemplate} className="text-sm font-semibold text-indigo-700 hover:underline dark:text-indigo-300">Download template</button>
         </div>
-        <input ref={fileInputRef} aria-label="Upload completed courses CSV" type="file" accept=".csv,text/csv" onChange={(event) => importCsv(event.target.files?.[0])} className="mt-3 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-200 file:px-3 file:py-2 file:font-semibold dark:text-zinc-300 dark:file:bg-zinc-700" />
+        <input ref={fileInputRef} aria-label="Upload completed courses CSV" type="file" accept=".csv,text/csv" onChange={(event) => void previewCsv(event.target.files?.[0])} className="mt-3 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-200 file:px-3 file:py-2 file:font-semibold dark:text-zinc-300 dark:file:bg-zinc-700" />
         {csvErrors.length > 0 && <ul role="alert" className="mt-3 space-y-1 text-sm text-red-700 dark:text-red-300">{csvErrors.map((error) => <li key={error}>{error}</li>)}</ul>}
+        {csvPreview && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 text-sm dark:border-zinc-800"><p><strong>{csvPreview.ready_count}</strong> ready · {csvPreview.invalid_count} invalid · {csvPreview.duplicate_count} duplicate</p><button type="button" disabled={!csvPreview.ready_count || isImporting} onClick={() => void confirmCsvImport()} className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{isImporting ? 'Importing…' : `Import ${csvPreview.ready_count} valid ${csvPreview.ready_count === 1 ? 'course' : 'courses'}`}</button></div>}
+      </div>
+
+      <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+        <div><h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Add evidence from your resume <span className="font-normal text-zinc-500">(Optional)</span></h2><p className="mt-1 text-xs leading-5 text-zinc-600 dark:text-zinc-400">PDF or DOCX, up to 5 MB. Trellis stores the file in your Appwrite account and adds low-confidence evidence without replacing stronger evidence.</p></div>
+        <input aria-label="Upload resume" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={isParsingResume} onChange={(event) => void parseResume(event.target.files?.[0])} className="mt-3 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-200 file:px-3 file:py-2 file:font-semibold disabled:opacity-60 dark:text-zinc-300 dark:file:bg-zinc-700" />
+        {isParsingResume && <p role="status" className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">Uploading and extracting evidence…</p>}
+        {resumeError && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">{resumeError}</p>}
+        {resumeResult && <p role="status" className="mt-3 text-sm text-emerald-800 dark:text-emerald-300">Found {resumeResult.skills_found.length} skills. {resumeResult.skills_added.length ? `Added ${resumeResult.skills_added.join(', ')}.` : 'No new skills were added.'} Resume evidence did not overwrite stronger evidence.</p>}
       </div>
 
       {value.courses.length > 0 && <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">{value.courses.map((course, index) => <li key={`${course.title}-${index}`} className="flex items-center justify-between gap-3 px-3 py-3"><div><p className="text-sm font-semibold text-zinc-900 dark:text-white">{course.title}</p><p className="text-xs text-zinc-600 dark:text-zinc-400">{course.provider || 'Provider not specified'}</p></div><button type="button" aria-label={`Remove ${course.title}`} onClick={() => onChange({ ...value, courses: value.courses.filter((_, itemIndex) => itemIndex !== index) })} className="rounded-md px-2 py-1 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-red-700 dark:text-zinc-400 dark:hover:bg-zinc-800">Remove</button></li>)}</ul>}
