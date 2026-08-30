@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
-from database import Base, LearningResource, RoadmapMilestone, get_db
+from database import Base, LearningResource, RoadmapMilestone, RoadmapResourceAssignment, get_db
 from main import app
 from roadmap_engine import canonical_skill_name
 
@@ -72,6 +72,24 @@ def test_generated_roadmap_is_prerequisite_aware_scheduled_and_explained(roadmap
     assert all(item["explanation"]["why"] for item in roadmap["milestones"])
     urls = [resource["url"] for item in roadmap["milestones"] for resource in item["recommended_resources"]]
     assert expected_url in urls
+
+
+def test_vetted_resources_enter_new_roadmaps_without_admin_review_and_are_assigned(roadmap_client):
+    client, db, _identity = roadmap_client
+    complete_onboarding(client)
+    db.add_all([
+        LearningResource(id="vetted-api", provider="youtube", external_id="vetted-api", canonical_key="youtube:vetted-api", resource_type="video", title="API design tutorial", url="https://youtube.com/watch?v=vetted-api", topics=["API design"], language="English", verification_status="vetted", resource_score=91, score_confidence=.8, score_version="trellis-resource-score/v1", link_status="healthy", author="Teacher"),
+        LearningResource(id="discovered-api", provider="youtube", external_id="discovered-api", canonical_key="youtube:discovered-api", resource_type="video", title="API design draft", url="https://youtube.com/watch?v=discovered-api", topics=["API design"], language="English", verification_status="discovered", resource_score=99, score_confidence=.9, link_status="healthy"),
+    ])
+    db.commit()
+
+    response = client.post("/v1/roadmaps", json={})
+
+    assert response.status_code == 201
+    resources = [resource for milestone in response.json()["milestones"] for resource in milestone["recommended_resources"]]
+    assert any(resource["id"] == "vetted-api" and resource["status"] == "vetted" for resource in resources)
+    assert all(resource["id"] != "discovered-api" for resource in resources)
+    assert db.query(RoadmapResourceAssignment).filter_by(resource_id="vetted-api").count() == 1
 
 
 def test_completed_learning_prevents_redundant_foundation_milestone(roadmap_client):

@@ -7,6 +7,7 @@ import math
 import re
 import uuid
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from auth import AuthenticatedUser
@@ -14,10 +15,15 @@ from database import (
     LearningActivity,
     LearningHistory,
     LearningResource,
+    LearnerGoalSkill,
+    ResourceSkillMap,
     Roadmap,
     RoadmapMilestone,
     RoadmapVersion,
+    RoadmapResourceAssignment,
+    Skill,
 )
+from config import settings
 from errors import APIError
 from profile_service import LearnerProfileService
 from roadmap_schemas import (
@@ -90,7 +96,7 @@ class RoadmapService:
         for history in self.db.query(LearningHistory).filter(LearningHistory.user_id == identity.user_id):
             known.update(canonical_skill_name(topic) for topic in (history.topics or []))
             known.add(canonical_skill_name(history.title))
-        path = target_path(role)
+        path = self._goal_path(profile) if role == profile.target_role else target_path(role)
         gaps = [item for item in path if canonical_skill_name(item["skill"]) not in known]
         if not gaps:
             gaps = [{"key": "capstone", "title": f"Demonstrate {role} readiness", "skill": f"applied {role}", "hours": 12, "requires": []}]
@@ -111,7 +117,7 @@ class RoadmapService:
         self.db.flush()
         version = RoadmapVersion(
             id=str(uuid.uuid4()), roadmap_id=roadmap.id, version_number=1, status="active",
-            rationale="Initial roadmap generated from confirmed profile, history, and verified resources.",
+            rationale="Initial roadmap generated from confirmed profile, history, and the verified/vetted resource index.",
             change_summary={"created": [item["key"] for item in gaps]}, created_at=now, activated_at=now,
         )
         self.db.add(version)
@@ -133,11 +139,18 @@ class RoadmapService:
                 explanation={
                     "why": f"Your confirmed goal requires {item['skill']}, and current evidence does not yet demonstrate intermediate proficiency.",
                     "confidence": 0.8 if resources else 0.65,
-                    "provenance": ["learner_profile", "learning_history", "verified_catalog"],
+                    "provenance": ["learner_profile", "learning_history", "resource_index"],
                     "alternatives": [],
                 },
             )
             self.db.add(milestone)
+            self.db.flush()
+            for resource_sequence, resource in enumerate(resources, start=1):
+                self.db.add(RoadmapResourceAssignment(
+                    id=str(uuid.uuid4()), milestone_id=milestone.id, resource_id=resource["id"], sequence=resource_sequence,
+                    score_at_assignment=resource.get("score"), confidence_at_assignment=resource.get("confidence"),
+                    score_version=resource.get("score_version"), created_at=now,
+                ))
         self.db.commit()
         return self.get(identity, roadmap.id)
 
@@ -190,18 +203,90 @@ class RoadmapService:
 
     def _resources_for(self, skill_name: str, language: str | None) -> list[dict]:
         canonical = canonical_skill_name(skill_name)
-        resources = self.db.query(LearningResource).filter(LearningResource.verification_status == "verified", LearningResource.archived_at.is_(None)).all()
+        resources = self.db.query(LearningResource).filter(
+            LearningResource.archived_at.is_(None), LearningResource.suppressed_at.is_(None),
+            LearningResource.link_status.notin_(["broken", "unsafe"]),
+            or_(
+                LearningResource.verification_status == "verified",
+                and_(
+                    LearningResource.verification_status == "vetted",
+                    LearningResource.resource_score >= settings.RESOURCE_VETTED_SCORE_THRESHOLD,
+                    LearningResource.score_confidence >= settings.RESOURCE_MIN_CONFIDENCE,
+                ),
+            ),
+        ).all()
+        resource_ids = [resource.id for resource in resources]
+        indexed: dict[str, float] = {}
+        if resource_ids:
+            for mapping, skill in self.db.query(ResourceSkillMap, Skill).join(
+                Skill, ResourceSkillMap.skill_id == Skill.id
+            ).filter(ResourceSkillMap.resource_id.in_(resource_ids)).all():
+                if canonical_skill_name(skill.display_name) == canonical:
+                    indexed[mapping.resource_id] = mapping.relevance_score
         ranked = []
         for resource in resources:
             terms = {canonical_skill_name(topic) for topic in (resource.topics or [])}
             title = resource.title.casefold()
-            score = 1 if canonical in terms or any(part in title for part in canonical.split()) else 0
+            relevance = indexed.get(resource.id, 100 if canonical in terms or any(part in title for part in canonical.split()) else 0)
+            if relevance < 60:
+                continue
+            algorithm_score = resource.score_override if resource.score_override is not None else resource.resource_score
+            score = float(algorithm_score if algorithm_score is not None else 82)
+            confidence = float(resource.score_confidence if resource.score_confidence is not None else .95)
+            rank_score = score * (0.7 + 0.3 * confidence) + (8 if resource.verification_status == "verified" else 0)
             if language and resource.language.casefold() == language.casefold():
-                score += 0.2
-            if score:
-                ranked.append((score, resource))
+                rank_score += 3
+            ranked.append((rank_score, resource, score, confidence))
         ranked.sort(key=lambda pair: (-pair[0], pair[1].title.casefold()))
-        return [{"id": item.id, "title": item.title, "provider": item.provider, "type": item.resource_type, "url": item.url, "explanation": f"Verified {item.resource_type} covering {skill_name}.", "provenance": "verified_catalog"} for _, item in ranked[:3]]
+        selected = []
+        creator_counts: dict[str, int] = {}
+        seen_types: set[str] = set()
+        for prefer_new_type in (True, False):
+            for item in ranked:
+                if item in selected:
+                    continue
+                resource = item[1]
+                creator = (resource.author or resource.provider).casefold()
+                if creator_counts.get(creator, 0) >= 2:
+                    continue
+                if prefer_new_type and resource.resource_type in seen_types:
+                    continue
+                selected.append(item)
+                creator_counts[creator] = creator_counts.get(creator, 0) + 1
+                seen_types.add(resource.resource_type)
+                if len(selected) == 3:
+                    break
+            if len(selected) == 3:
+                break
+        return [{
+            "id": item.id, "title": item.title, "provider": item.provider, "type": item.resource_type,
+            "url": item.url, "status": item.verification_status, "score": round(score, 2),
+            "confidence": round(confidence, 3), "score_version": item.score_version,
+            "explanation": (
+                f"Human-reviewed {item.resource_type} covering {skill_name}." if item.verification_status == "verified"
+                else f"Automatically vetted {item.resource_type} covering {skill_name}."
+            ),
+            "provenance": "verified_catalog" if item.verification_status == "verified" else "vetted_index",
+        } for _rank, item, score, confidence in selected]
+
+    def _goal_path(self, profile) -> list[dict]:
+        rows = self.db.query(LearnerGoalSkill, Skill).join(Skill, LearnerGoalSkill.skill_id == Skill.id).filter(
+            LearnerGoalSkill.user_id == profile.user_id,
+            LearnerGoalSkill.profile_version == profile.profile_version,
+        ).order_by(LearnerGoalSkill.sequence).all()
+        if not rows:
+            return target_path(profile.target_role or "learning goal")
+        key_by_skill_id = {
+            requirement.skill_id: re.sub(r"[^a-z0-9]+", "-", skill.canonical_name).strip("-")
+            for requirement, skill in rows
+        }
+        return [{
+            "key": key_by_skill_id[requirement.skill_id],
+            "title": f"Build proficiency in {skill.display_name}",
+            "skill": skill.display_name,
+            "hours": 14 if requirement.resource_intent == "project" else 10 if requirement.importance >= .9 else 8,
+            "requires": [key_by_skill_id[skill_id] for skill_id in (requirement.prerequisite_skill_ids or []) if skill_id in key_by_skill_id],
+        } for requirement, skill in rows]
 
     def _owned_milestone(self, identity: AuthenticatedUser, roadmap_id: str, milestone_id: str):
         roadmap = self.db.query(Roadmap).filter(Roadmap.id == roadmap_id, Roadmap.user_id == identity.user_id).first()

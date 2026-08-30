@@ -43,9 +43,9 @@ JAVA_BACKEND_PLAN = [
 ]
 
 GENERIC_BACKEND_PLAN = [
-    _requirement("Programming fundamentals", importance=1),
-    _requirement("API design", ["Programming fundamentals"], "tutorial", 1),
-    _requirement("Databases", ["Programming fundamentals"], "tutorial", 0.9),
+    _requirement("Python", importance=1),
+    _requirement("API design", ["Python"], "tutorial", 1),
+    _requirement("Databases", ["Python"], "tutorial", 0.9),
     _requirement("Testing", ["API design"], "tutorial", 0.9),
     _requirement("Deployment", ["Testing", "Databases"], "project", 0.85),
 ]
