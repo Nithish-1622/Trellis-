@@ -202,11 +202,15 @@ class LearningResource(Base):
     id = Column(String, primary_key=True)
     provider = Column(String, nullable=False)
     external_id = Column(String, nullable=True)
+    canonical_key = Column(String, nullable=True, unique=True)
     resource_type = Column(String, nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     level = Column(String, nullable=True)
     duration_minutes = Column(Integer, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    author = Column(String, nullable=True)
+    published_at = Column(DateTime, nullable=True)
     topics = Column(JSON, nullable=False, default=list)
     prerequisites = Column(JSON, nullable=False, default=list)
     cost_type = Column(String, nullable=False, default="free")
@@ -215,14 +219,176 @@ class LearningResource(Base):
     language = Column(String, nullable=False, default="English")
     url = Column(String, nullable=False)
     thumbnail_url = Column(String, nullable=True)
-    verification_status = Column(String, nullable=False, default="pending")
+    verification_status = Column(String, nullable=False, default="discovered")
     verified_by = Column(String, nullable=True)
     verified_at = Column(DateTime, nullable=True)
     archived_at = Column(DateTime, nullable=True)
     link_status = Column(String, nullable=False, default="unchecked")
+    resource_score = Column(Float, nullable=True)
+    score_confidence = Column(Float, nullable=True)
+    score_version = Column(String, nullable=True)
+    freshness_class = Column(String, nullable=False, default="moderate")
+    last_evaluated_at = Column(DateTime, nullable=True)
+    is_pinned = Column(Boolean, nullable=False, default=False)
+    score_override = Column(Float, nullable=True)
+    override_reason = Column(Text, nullable=True)
+    suppressed_at = Column(DateTime, nullable=True)
     resource_metadata = Column("metadata", JSON, nullable=False, default=dict)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class LearnerGoalSkill(Base):
+    """Versioned skill requirement derived from a confirmed learner goal."""
+    __tablename__ = "learner_goal_skills"
+    __table_args__ = (
+        UniqueConstraint("user_id", "profile_version", "skill_id", name="uq_goal_skill_profile_version"),
+        Index("ix_goal_skills_user_version", "user_id", "profile_version"),
+    )
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    skill_id = Column(String, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
+    profile_version = Column(Integer, nullable=False)
+    target_level = Column(String, nullable=False)
+    importance = Column(Float, nullable=False, default=0.5)
+    sequence = Column(Integer, nullable=False)
+    prerequisite_skill_ids = Column(JSON, nullable=False, default=list)
+    resource_intent = Column(String, nullable=False, default="explanation")
+    analyzer_version = Column(String, nullable=False)
+    confidence = Column(Float, nullable=False, default=0.5)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ResourceSkillMap(Base):
+    """Searchable relevance between an indexed resource and canonical skill."""
+    __tablename__ = "resource_skill_map"
+    __table_args__ = (
+        UniqueConstraint("resource_id", "skill_id", name="uq_resource_skill"),
+        Index("ix_resource_skill_lookup", "skill_id", "relevance_score"),
+    )
+
+    id = Column(String, primary_key=True)
+    resource_id = Column(String, ForeignKey("learning_resources.id", ondelete="CASCADE"), nullable=False)
+    skill_id = Column(String, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
+    relevance_score = Column(Float, nullable=False)
+    evidence = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ResourceEvaluation(Base):
+    """Immutable, versioned evidence for an automated resource score."""
+    __tablename__ = "resource_evaluations"
+    __table_args__ = (Index("ix_resource_evaluations_resource_time", "resource_id", "evaluated_at"),)
+
+    id = Column(String, primary_key=True)
+    resource_id = Column(String, ForeignKey("learning_resources.id", ondelete="CASCADE"), nullable=False)
+    evaluation_version = Column(String, nullable=False)
+    relevance_score = Column(Float, nullable=False)
+    content_quality_score = Column(Float, nullable=False)
+    engagement_score = Column(Float, nullable=False)
+    creator_score = Column(Float, nullable=False)
+    freshness_score = Column(Float, nullable=False)
+    final_score = Column(Float, nullable=False)
+    confidence = Column(Float, nullable=False)
+    model_version = Column(String, nullable=True)
+    input_fingerprint = Column(String, nullable=False)
+    evidence = Column(JSON, nullable=False, default=dict)
+    evaluated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ResourceJob(Base):
+    """Durable Postgres-backed discovery, evaluation, and cleanup job."""
+    __tablename__ = "resource_jobs"
+    __table_args__ = (
+        UniqueConstraint("job_type", "dedupe_key", name="uq_resource_job_dedupe"),
+        Index("ix_resource_jobs_claim", "status", "run_at", "created_at"),
+        Index("ix_resource_jobs_user", "user_id", "created_at"),
+    )
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=True)
+    job_type = Column(String, nullable=False)
+    dedupe_key = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="queued")
+    payload = Column(JSON, nullable=False, default=dict)
+    result = Column(JSON, nullable=False, default=dict)
+    progress = Column(Integer, nullable=False, default=0)
+    attempts = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=3)
+    run_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    locked_at = Column(DateTime, nullable=True)
+    locked_by = Column(String, nullable=True)
+    last_error_code = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+class RoadmapResourceAssignment(Base):
+    """Normalized resource placement retained beside the milestone JSON snapshot."""
+    __tablename__ = "roadmap_resource_assignments"
+    __table_args__ = (
+        UniqueConstraint("milestone_id", "resource_id", name="uq_milestone_resource_assignment"),
+        Index("ix_resource_assignments_resource", "resource_id"),
+    )
+
+    id = Column(String, primary_key=True)
+    milestone_id = Column(String, ForeignKey("roadmap_milestones.id", ondelete="CASCADE"), nullable=False)
+    resource_id = Column(String, ForeignKey("learning_resources.id", ondelete="RESTRICT"), nullable=False)
+    sequence = Column(Integer, nullable=False)
+    score_at_assignment = Column(Float, nullable=True)
+    confidence_at_assignment = Column(Float, nullable=True)
+    score_version = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ResourceInteraction(Base):
+    """Privacy-bounded learner interaction retained for ninety days."""
+    __tablename__ = "resource_interactions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_resource_interaction_idempotency"),
+        Index("ix_resource_interactions_resource_time", "resource_id", "created_at"),
+    )
+
+    id = Column(String, primary_key=True)
+    resource_id = Column(String, ForeignKey("learning_resources.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    milestone_id = Column(String, ForeignKey("roadmap_milestones.id", ondelete="SET NULL"), nullable=True)
+    session_id = Column(String, nullable=True)
+    idempotency_key = Column(String, nullable=False)
+    event_type = Column(String, nullable=False)
+    event_metadata = Column("metadata", JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ResourceSignalSummary(Base):
+    """Non-identifying aggregate feedback used for inspection and future scoring."""
+    __tablename__ = "resource_signal_summaries"
+
+    resource_id = Column(String, ForeignKey("learning_resources.id", ondelete="CASCADE"), primary_key=True)
+    impressions = Column(Integer, nullable=False, default=0)
+    opens = Column(Integer, nullable=False, default=0)
+    helpful = Column(Integer, nullable=False, default=0)
+    not_helpful = Column(Integer, nullable=False, default=0)
+    reports = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ResourceModerationAction(Base):
+    """Audited administrator exception action without altering evaluation history."""
+    __tablename__ = "resource_moderation_actions"
+    __table_args__ = (Index("ix_resource_moderation_resource_time", "resource_id", "created_at"),)
+
+    id = Column(String, primary_key=True)
+    resource_id = Column(String, ForeignKey("learning_resources.id", ondelete="CASCADE"), nullable=False)
+    admin_user_id = Column(String, nullable=False)
+    action_type = Column(String, nullable=False)
+    reason = Column(Text, nullable=False)
+    previous_value = Column(JSON, nullable=False, default=dict)
+    new_value = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class Memory(Base):
