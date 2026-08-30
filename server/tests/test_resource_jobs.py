@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -102,6 +102,41 @@ def test_recurring_maintenance_is_deduplicated(job_db):
     service.schedule_recurring()
 
     assert db.query(ResourceJob).filter_by(job_type="interaction_cleanup").count() == 1
+
+
+def test_recurring_maintenance_does_not_distinct_full_resource_rows(job_db):
+    db, _profile = job_db
+    skill = db.query(Skill).first()
+    resource = LearningResource(
+        id="reevaluation-candidate", provider="youtube", external_id="candidate",
+        canonical_key="youtube:candidate", resource_type="video", title="Candidate",
+        url="https://youtube.com/watch?v=candidate", verification_status="vetted",
+        link_status="healthy", language="English", topics=[],
+    )
+    db.add(resource)
+    db.flush()
+    db.add(ResourceSkillMap(
+        id="reevaluation-map", resource_id=resource.id, skill_id=skill.id,
+        relevance_score=90, evidence={},
+    ))
+    db.commit()
+    statements: list[str] = []
+
+    def capture_statement(_conn, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(db.bind, "before_cursor_execute", capture_statement)
+    try:
+        ResourceJobService(db).schedule_recurring()
+    finally:
+        event.remove(db.bind, "before_cursor_execute", capture_statement)
+
+    candidate_queries = [
+        statement for statement in statements
+        if "FROM learning_resources" in statement and "resource_skill_map" in statement
+    ]
+    assert candidate_queries
+    assert all("SELECT DISTINCT" not in statement.upper() for statement in candidate_queries)
 
 
 @pytest.mark.asyncio

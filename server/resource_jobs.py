@@ -146,11 +146,13 @@ class ResourceJobService:
             "interaction_cleanup", now.strftime("interaction-cleanup:%Y-%m-%d"), {},
         )
         scheduled += int(cleanup is not None and cleanup.status == "queued")
-        candidates = self.db.query(LearningResource).join(
-            ResourceSkillMap, ResourceSkillMap.resource_id == LearningResource.id
-        ).outerjoin(
+        has_skill_mapping = self.db.query(ResourceSkillMap.id).filter(
+            ResourceSkillMap.resource_id == LearningResource.id
+        ).exists()
+        candidates = self.db.query(LearningResource).outerjoin(
             ResourceSignalSummary, ResourceSignalSummary.resource_id == LearningResource.id
         ).filter(
+            has_skill_mapping,
             LearningResource.verification_status.in_(["verified", "vetted", "discovered"]),
             LearningResource.archived_at.is_(None),
             or_(
@@ -160,7 +162,7 @@ class ResourceJobService:
                 and_(LearningResource.freshness_class == "stable", LearningResource.last_evaluated_at < now - timedelta(days=90)),
                 ResourceSignalSummary.impressions >= 100,
             ),
-        ).distinct().order_by(LearningResource.last_evaluated_at.asc()).limit(settings.RESOURCE_REEVALUATION_BATCH_SIZE).all()
+        ).order_by(LearningResource.last_evaluated_at.asc()).limit(settings.RESOURCE_REEVALUATION_BATCH_SIZE).all()
         for resource in candidates:
             job = self.enqueue_evaluation(resource.id, "scheduled_freshness_or_usage")
             scheduled += int(job.status == "queued")
