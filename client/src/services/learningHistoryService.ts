@@ -22,13 +22,21 @@ export interface CsvImportResult extends CsvPreview {
   rejected_count: number
 }
 
-export interface ResumeEvidence {
+export interface ResumeSkillSuggestion {
+  name: string
+  proficiency: 'beginner' | 'intermediate' | 'advanced' | 'expert'
+  rationale: string | null
+}
+
+export interface ResumeCapabilities {
   filename: string
-  skills_found: string[]
-  skills_added: string[]
-  evidence_count: number
-  education_count: number
-  experience_count: number
+  resume_file_id: string | null
+  current_role: string | null
+  experience_years: number | null
+  education_level: string | null
+  skills: ResumeSkillSuggestion[]
+  certifications: string[]
+  projects: string[]
 }
 
 const fileRequest = <T>(path: string, file: File, extra?: Record<string, string>) => {
@@ -44,20 +52,12 @@ export const previewLearningHistoryCsv = (file: File) =>
 export const importLearningHistoryCsv = (file: File) =>
   fileRequest<CsvImportResult>('/v1/me/learning-history/csv/import?allow_partial=true', file)
 
-export const uploadResumeEvidence = async (file: File) => {
+export const previewResumeCapabilities = (file: File) =>
+  fileRequest<ResumeCapabilities>('/v1/me/resume/parse', file)
+
+export const storeAcceptedResume = async (file: File) => {
   const bucketId = import.meta.env.VITE_APPWRITE_BUCKET_ID
   if (!bucketId) throw new Error('Resume storage is not configured. Please contact support.')
   const uploaded = await storage.createFile(bucketId, ID.unique(), file)
-  try {
-    return await fileRequest<ResumeEvidence>('/v1/me/resume/parse', file, {
-      resume_file_id: uploaded.$id,
-    })
-  } catch (error) {
-    try {
-      await storage.deleteFile(bucketId, uploaded.$id)
-    } catch {
-      // Parsing remains the primary error; orphan cleanup can be retried operationally.
-    }
-    throw error
-  }
+  return uploaded.$id
 }

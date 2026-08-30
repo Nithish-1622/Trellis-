@@ -19,6 +19,7 @@ export interface SkillDraft {
   proficiency: 'beginner' | 'intermediate' | 'advanced' | 'expert'
   evidence_source: string
   evidence_url?: string | null
+  evidence_rationale?: string | null
 }
 
 export interface CurrentPositionDraft {
@@ -27,6 +28,10 @@ export interface CurrentPositionDraft {
   education_level?: string | null
   interests: string[]
   skills: SkillDraft[]
+  resume_filename?: string | null
+  resume_file_id?: string | null
+  resume_certifications?: string[]
+  resume_projects?: string[]
 }
 
 export interface CompletedCourseDraft {

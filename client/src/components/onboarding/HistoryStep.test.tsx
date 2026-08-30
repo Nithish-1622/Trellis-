@@ -1,16 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { previewLearningHistoryCsv, importLearningHistoryCsv, uploadResumeEvidence } = vi.hoisted(() => ({
+const { previewLearningHistoryCsv, importLearningHistoryCsv } = vi.hoisted(() => ({
   previewLearningHistoryCsv: vi.fn(),
   importLearningHistoryCsv: vi.fn(),
-  uploadResumeEvidence: vi.fn(),
 }))
 
 vi.mock('../../services/learningHistoryService', () => ({
   previewLearningHistoryCsv,
   importLearningHistoryCsv,
-  uploadResumeEvidence,
 }))
 
 import HistoryStep from './HistoryStep'
@@ -41,24 +39,5 @@ describe('HistoryStep', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Import 1 valid course' }))
     expect(importLearningHistoryCsv).toHaveBeenCalled()
     await waitFor(() => expect(onChange).toHaveBeenCalledWith({ courses: [course] }))
-  })
-
-  it('shows which skills resume evidence added', async () => {
-    uploadResumeEvidence.mockResolvedValue({
-      filename: 'resume.pdf',
-      skills_found: ['Python', 'Docker'],
-      skills_added: ['Docker'],
-      evidence_count: 2,
-      education_count: 1,
-      experience_count: 2,
-    })
-    render(<HistoryStep value={{ courses: [] }} onChange={vi.fn()} />)
-
-    fireEvent.change(screen.getByLabelText('Upload resume'), {
-      target: { files: [new File(['pdf'], 'resume.pdf', { type: 'application/pdf' })] },
-    })
-
-    expect(await screen.findByText(/Added Docker/)).toBeVisible()
-    expect(screen.getByText(/did not overwrite stronger evidence/)).toBeVisible()
   })
 })
