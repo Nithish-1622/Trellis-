@@ -7,7 +7,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 
 
 ResourceType = Literal["course", "video", "project", "article", "assessment"]
-VerificationStatus = Literal["pending", "verified", "rejected"]
+VerificationStatus = Literal["verified", "vetted", "discovered", "rejected"]
 
 
 class ResourceCreate(BaseModel):
@@ -26,7 +26,7 @@ class ResourceCreate(BaseModel):
     language: str = Field(default="English", min_length=1, max_length=100)
     url: AnyHttpUrl
     thumbnail_url: AnyHttpUrl | None = None
-    verification_status: VerificationStatus = "pending"
+    verification_status: VerificationStatus = "discovered"
     metadata: dict = Field(default_factory=dict)
 
 
@@ -56,11 +56,15 @@ class ResourceResponse(BaseModel):
     id: str
     provider: str
     external_id: str | None
+    canonical_key: str | None
     resource_type: str
     title: str
     description: str | None
     level: str | None
     duration_minutes: int | None
+    duration_seconds: int | None
+    author: str | None
+    published_at: datetime | None
     topics: list[str]
     prerequisites: list[str]
     cost_type: str
@@ -74,6 +78,15 @@ class ResourceResponse(BaseModel):
     verified_at: datetime | None
     archived_at: datetime | None
     link_status: str
+    resource_score: float | None
+    score_confidence: float | None
+    score_version: str | None
+    freshness_class: str
+    last_evaluated_at: datetime | None
+    is_pinned: bool
+    score_override: float | None
+    override_reason: str | None
+    suppressed_at: datetime | None
     metadata: dict = Field(validation_alias="resource_metadata")
     created_at: datetime
     updated_at: datetime
@@ -88,6 +101,11 @@ class ResourcePage(BaseModel):
 
 class ResourceRecommendation(ResourceResponse):
     score: float
+    confidence: float
+    skills: list[str]
+    source: str
+    status: str
+    why_recommended: list[str]
     explanation: str
     provenance: str
     prerequisite_status: str
@@ -113,3 +131,15 @@ class ImportResult(BaseModel):
     created: int
     skipped: int
     items: list[ResourceResponse]
+
+
+class DiscoveryJobResponse(BaseModel):
+    id: str
+    status: str
+    progress: int
+    profile_version: int
+    coverage: list[dict] = Field(default_factory=list)
+    coverage_gaps: list[str] = Field(default_factory=list)
+    failure_code: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None

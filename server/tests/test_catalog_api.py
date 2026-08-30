@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
-from database import Base, LearningResource, get_db
+from database import Base, LearningResource, ResourceJob, get_db
 from catalog_api import get_link_checker
 from main import app
 from resource_providers import ExternalResource, get_hybrid_resource_provider
@@ -83,7 +83,7 @@ def test_admin_can_create_verify_and_archive_resource(catalog_client):
 def test_recommendations_only_return_verified_real_catalog_urls(catalog_client):
     client, _db, identity = catalog_client
     assert client.post("/v1/admin/resources", json=resource_payload()).status_code == 201
-    unverified = {**resource_payload(), "external_id": "draft", "title": "Draft resource", "url": "https://academy.example.test/draft", "verification_status": "pending"}
+    unverified = {**resource_payload(), "external_id": "draft", "title": "Draft resource", "url": "https://academy.example.test/draft", "verification_status": "discovered"}
     assert client.post("/v1/admin/resources", json=unverified).status_code == 201
     identity["user"] = AuthenticatedUser(user_id="learner", email="learner@example.com", name="Learner", roles=["learner"])
     onboarding = {
@@ -125,16 +125,19 @@ def test_missing_catalog_resource_uses_structured_error(catalog_client):
     assert response.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
 
 
-def test_recommendations_merge_validated_live_resources_and_keep_catalog_fallback(catalog_client):
-    client, _db, identity = catalog_client
+def test_recommendations_use_only_indexed_verified_and_vetted_resources(catalog_client):
+    client, db, identity = catalog_client
     assert client.post("/v1/admin/resources", json=resource_payload()).status_code == 201
+    db.add_all([
+        LearningResource(id="vetted", provider="youtube", external_id="video-1", canonical_key="youtube:video-1", resource_type="video", title="Backend API design", description="A current walkthrough", url="https://www.youtube.com/watch?v=video-1", topics=["APIs"], language="English", verification_status="vetted", resource_score=91, score_confidence=.82, score_version="trellis-resource-score/v1", link_status="healthy", resource_metadata={}, author="Teacher"),
+        LearningResource(id="discovered", provider="youtube", external_id="video-2", canonical_key="youtube:video-2", resource_type="video", title="Hidden API draft", url="https://www.youtube.com/watch?v=video-2", topics=["APIs"], language="English", verification_status="discovered", resource_score=79, score_confidence=.8, link_status="healthy", resource_metadata={}),
+    ])
+    db.commit()
     identity["user"] = AuthenticatedUser(user_id="learner", email="learner@example.com", name="Learner", roles=["learner"])
 
     class StubProvider:
-        async def search(self, query: str, limit: int):
-            assert "Backend Engineer" in query
-            assert limit <= 25
-            return [ExternalResource(provider="youtube", external_id="video-1", resource_type="video", title="Backend API design", description="A current walkthrough", url="https://www.youtube.com/watch?v=video-1", topics=["APIs"])]
+        async def search(self, _query, _limit):
+            raise AssertionError("Recommendations must not call external providers")
 
     app.dependency_overrides[get_hybrid_resource_provider] = lambda: StubProvider()
     profile = {"current_step": "review", "completed_steps": ["goal", "current_position", "previous_learning", "preferences"], "complete": True, "draft": {"goal": {"free_text": "Become a backend engineer this year", "target_role": "Backend Engineer", "objective": "Build APIs"}, "current_position": {"interests": [], "skills": []}, "previous_learning": {"courses": []}, "preferences": {"preferred_formats": [], "weekly_hours": 8, "accessibility_needs": []}}}
@@ -143,12 +146,17 @@ def test_recommendations_merge_validated_live_resources_and_keep_catalog_fallbac
     response = client.get("/v1/resources/recommendations?include_live=true")
 
     assert response.status_code == 200
-    provenances = {item["provenance"] for item in response.json()["items"]}
-    assert provenances == {"verified_catalog", "youtube"}
+    items = response.json()["items"]
+    assert {item["verification_status"] for item in items} == {"verified", "vetted"}
+    vetted = next(item for item in items if item["verification_status"] == "vetted")
+    assert vetted["score"] == 91
+    assert vetted["confidence"] == .82
+    assert vetted["why_recommended"]
+    assert all(item["id"] != "discovered" for item in items)
 
 
-def test_admin_can_bulk_import_and_sync_provider_preview(catalog_client):
-    client, db, _identity = catalog_client
+def test_admin_can_bulk_import_and_preview_but_manual_provider_sync_is_removed(catalog_client):
+    client, _db, _identity = catalog_client
     second = {**resource_payload(), "external_id": "python-api-201", "title": "Advanced API Reliability", "url": "https://academy.example.test/python-api-201"}
 
     bulk = client.post("/v1/admin/resources/bulk", json={"resources": [resource_payload(), second]})
@@ -160,11 +168,28 @@ def test_admin_can_bulk_import_and_sync_provider_preview(catalog_client):
             return [ExternalResource(provider="github", external_id="123", resource_type="project", title="example/backend-project", url="https://github.com/example/backend-project", topics=["APIs"])]
 
     app.dependency_overrides[get_hybrid_resource_provider] = lambda: StubProvider()
-    synced = client.post("/v1/admin/resources/provider-sync", json={"query": "backend APIs", "limit": 5})
-    assert synced.status_code == 201
-    assert synced.json()["created"] == 1
-    external = db.query(LearningResource).filter(LearningResource.provider == "github").one()
-    assert external.verification_status == "pending"
+    preview = client.get("/v1/admin/resources/provider-preview?query=backend%20APIs&limit=5")
+    assert preview.status_code == 200
+    assert preview.json()[0]["canonical_key"] == "github:example/backend-project"
+    assert client.post("/v1/admin/resources/provider-sync", json={"query": "backend APIs", "limit": 5}).status_code == 405
+
+
+def test_discovery_job_is_idempotent_owned_and_does_not_repeat_provider_calls(catalog_client):
+    client, db, identity = catalog_client
+    identity["user"] = AuthenticatedUser(user_id="learner", email="learner@example.com", name="Learner", roles=["learner"])
+    profile = {"current_step": "review", "completed_steps": ["goal", "current_position", "previous_learning", "preferences"], "complete": True, "draft": {"goal": {"free_text": "Become a backend engineer this year", "target_role": "Backend Engineer", "objective": "Build APIs"}, "current_position": {"interests": [], "skills": []}, "previous_learning": {"courses": []}, "preferences": {"preferred_formats": [], "weekly_hours": 8, "accessibility_needs": []}}}
+    assert client.post("/v1/me/onboarding", json=profile).status_code == 200
+
+    first = client.post("/v1/resources/discover")
+    second = client.post("/v1/resources/discover")
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.json()["id"] == second.json()["id"]
+    assert db.query(ResourceJob).count() == 1
+    assert client.get(f"/v1/resources/discovery-jobs/{first.json()['id']}").status_code == 200
+    identity["user"] = AuthenticatedUser(user_id="other", email="other@example.com", name="Other", roles=["learner"])
+    assert client.get(f"/v1/resources/discovery-jobs/{first.json()['id']}").status_code == 404
 
 
 def test_admin_link_check_persists_status_without_exposing_provider_error(catalog_client):

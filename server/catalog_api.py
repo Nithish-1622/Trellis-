@@ -14,9 +14,9 @@ from sqlalchemy.orm import Session
 
 from auth import AuthenticatedUser, get_current_user, require_admin
 from catalog_schemas import (
+    DiscoveryJobResponse,
     RecommendationPage,
     ImportResult,
-    ProviderSyncRequest,
     ResourceBulkCreate,
     ResourceCreate,
     ResourcePage,
@@ -25,9 +25,11 @@ from catalog_schemas import (
     ResourceUpdate,
 )
 from catalog_service import CatalogService
-from database import get_db
+from database import ResourceJob, get_db
+from errors import APIError
 from profile_service import LearnerProfileService
 from resource_providers import ExternalResource, HybridResourceProvider, get_hybrid_resource_provider
+from resource_jobs import ResourceJobService
 from rate_limit import SlidingWindowRateLimiter, get_expensive_operation_limiter
 
 
@@ -68,27 +70,51 @@ def get_link_checker() -> LinkChecker:
 
 
 @learner_router.get("/recommendations", response_model=RecommendationPage)
-async def get_recommendations(
+def get_recommendations(
     identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
-    provider: Annotated[HybridResourceProvider, Depends(get_hybrid_resource_provider)],
-    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     offset: Annotated[int, Query(ge=0)] = 0,
     resource_type: ResourceType | None = None,
-    include_live: bool = True,
+    include_live: Annotated[bool | None, Query(deprecated=True)] = None,
 ) -> RecommendationPage:
-    service = CatalogService(db)
-    catalog_page = service.recommendations(identity, limit, offset, resource_type)
-    if not include_live or offset > 0:
-        return catalog_page
-    limiter.check(identity.user_id, "live_resources")
+    del include_live
+    return CatalogService(db).recommendations(identity, limit, offset, resource_type)
+
+
+def _job_response(job: ResourceJob) -> DiscoveryJobResponse:
+    result = job.result or {}
+    return DiscoveryJobResponse(
+        id=job.id, status=job.status, progress=job.progress,
+        profile_version=int((job.payload or {}).get("profile_version", 0)),
+        coverage=result.get("coverage", []), coverage_gaps=result.get("coverage_gaps", []),
+        failure_code=job.last_error_code, created_at=job.created_at, completed_at=job.completed_at,
+    )
+
+
+@learner_router.post("/discover", response_model=DiscoveryJobResponse, status_code=status.HTTP_202_ACCEPTED)
+def discover_resources(
+    identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
+) -> DiscoveryJobResponse:
+    limiter.check(identity.user_id, "resource_discovery")
     profile = LearnerProfileService(db).ensure_profile(identity)
-    query = " ".join(part for part in [profile.target_role, profile.objective] if part) or "practical learning project"
-    external = await provider.search(query, min(limit, 10))
-    if resource_type:
-        external = [item for item in external if item.resource_type == resource_type]
-    return service.merge_external(catalog_page, external, limit)
+    if profile.onboarding_completed_at is None:
+        raise APIError(status_code=409, code="ONBOARDING_REQUIRED", message="Complete onboarding before discovering resources")
+    return _job_response(ResourceJobService(db).enqueue_discovery(identity.user_id, profile.profile_version))
+
+
+@learner_router.get("/discovery-jobs/{job_id}", response_model=DiscoveryJobResponse)
+def get_discovery_job(
+    job_id: str,
+    identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> DiscoveryJobResponse:
+    job = db.query(ResourceJob).filter_by(id=job_id, user_id=identity.user_id, job_type="discovery").first()
+    if job is None:
+        raise APIError(status_code=404, code="DISCOVERY_JOB_NOT_FOUND", message="Discovery job was not found")
+    return _job_response(job)
 
 
 @admin_router.get("/provider-preview", response_model=list[ExternalResource])
@@ -129,18 +155,6 @@ def bulk_create_resources(
     db: Annotated[Session, Depends(get_db)],
 ) -> ImportResult:
     return CatalogService(db).bulk_create(admin, payload)
-
-
-@admin_router.post("/provider-sync", response_model=ImportResult, status_code=status.HTTP_201_CREATED)
-async def sync_provider_resources(
-    payload: ProviderSyncRequest,
-    admin: Annotated[AuthenticatedUser, Depends(require_admin)],
-    db: Annotated[Session, Depends(get_db)],
-    provider: Annotated[HybridResourceProvider, Depends(get_hybrid_resource_provider)],
-    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
-) -> ImportResult:
-    limiter.check(admin.user_id, "provider_sync")
-    return CatalogService(db).sync_external(admin, await provider.search(payload.query, payload.limit))
 
 
 @admin_router.post("/{resource_id}/check-link", response_model=ResourceResponse)
