@@ -35,6 +35,21 @@ QUIZ_BANK = {
         {"id": "python-2", "prompt": "Which statement manages a context manager?", "options": ["with", "match", "yield", "lambda"], "correct": "with"},
         {"id": "python-3", "prompt": "Which tool is commonly used for Python tests?", "options": ["pytest", "pip", "ruff-only", "venv"], "correct": "pytest"},
     ],
+    "api design": [
+        {"id": "api-1", "prompt": "Which HTTP method is normally used for an idempotent full replacement?", "options": ["PUT", "POST", "CONNECT", "TRACE"], "correct": "PUT"},
+        {"id": "api-2", "prompt": "What should an API return when a requested resource does not exist?", "options": ["A 404 response with a stable error contract", "A successful empty object", "An HTML stack trace", "A database exception"], "correct": "A 404 response with a stable error contract"},
+        {"id": "api-3", "prompt": "What best protects a public API from incompatible changes?", "options": ["A versioned, tested interface contract", "Undocumented response changes", "Client-specific server branches", "Removing validation"], "correct": "A versioned, tested interface contract"},
+    ],
+    "spring boot": [
+        {"id": "spring-1", "prompt": "What does @SpringBootApplication combine?", "options": ["Configuration, component scanning, and auto-configuration", "Only database migrations", "Only HTTP routing", "Container image creation"], "correct": "Configuration, component scanning, and auto-configuration"},
+        {"id": "spring-2", "prompt": "What is constructor injection primarily used for?", "options": ["Declaring explicit, testable dependencies", "Creating database tables", "Compiling JavaScript", "Encrypting HTTP traffic"], "correct": "Declaring explicit, testable dependencies"},
+        {"id": "spring-3", "prompt": "Where are Spring Boot environment-specific values commonly configured?", "options": ["Application properties or YAML and environment variables", "Controller method names", "Compiled class filenames", "Git commit messages"], "correct": "Application properties or YAML and environment variables"},
+    ],
+    "project": [
+        {"id": "project-1", "prompt": "What is the strongest evidence that this milestone's project works?", "options": ["A runnable repository with automated tests", "A screenshot without source code", "A copied tutorial title", "An unreviewable archive"], "correct": "A runnable repository with automated tests"},
+        {"id": "project-2", "prompt": "What should the project README explain?", "options": ["Setup, design decisions, and verification steps", "Only the project name", "Private credentials", "Unrelated job history"], "correct": "Setup, design decisions, and verification steps"},
+        {"id": "project-3", "prompt": "Which practice makes project feedback actionable?", "options": ["Tie findings to observable behavior and tests", "Use only a numeric rating", "Avoid reproduction steps", "Ignore failure cases"], "correct": "Tie findings to observable behavior and tests"},
+    ],
     "default": [
         {"id": "general-1", "prompt": "What best demonstrates a learned skill?", "options": ["A working project with tests", "A saved bookmark", "A course title", "A copied snippet"], "correct": "A working project with tests"},
         {"id": "general-2", "prompt": "What should happen before an advanced topic?", "options": ["Confirm prerequisites", "Skip practice", "Ignore feedback", "Remove milestones"], "correct": "Confirm prerequisites"},
@@ -153,7 +168,19 @@ class AssessmentService:
     @staticmethod
     def _questions(milestone: RoadmapMilestone) -> list[dict]:
         skill = canonical_skill_name((milestone.target_skills or [""])[0])
-        return QUIZ_BANK.get(skill, QUIZ_BANK["default"])
+        if "project" in skill or "project" in milestone.stable_key.casefold():
+            bank = QUIZ_BANK["project"]
+        elif skill in QUIZ_BANK:
+            bank = QUIZ_BANK[skill]
+        else:
+            matching_key = next((key for key in QUIZ_BANK if key != "default" and key in skill), None)
+            bank = QUIZ_BANK[matching_key] if matching_key else QUIZ_BANK["default"]
+        skill_label = (milestone.target_skills or [milestone.title])[0]
+        return [{
+            **question,
+            "id": f"{milestone.stable_key}-{question['id']}",
+            "prompt": f"{skill_label}: {question['prompt']}",
+        } for question in bank]
 
     @staticmethod
     def _response(attempt: AssessmentAttempt) -> AssessmentAttemptResponse:

@@ -18,8 +18,9 @@ from database import (
 from goal_skill_planner import GoalSkillService
 from profile_service import LearnerProfileService
 from resource_jobs import ResourceDiscoveryService, ResourceJobService
+from resource_coverage import ResourceCoverageService
 from resource_providers import ExternalResource, ResourceMetrics
-from resource_vetting import EvaluationResult
+from resource_vetting import EvaluationResult, SCORE_VERSION
 
 
 @pytest.fixture
@@ -59,6 +60,53 @@ def test_discovery_jobs_are_idempotent_per_profile_version_and_claimed_once(job_
     assert claimed.status == "running"
     assert claimed.attempts == 1
     assert claimed_again is None
+
+
+def test_current_discovery_version_does_not_reuse_legacy_completed_job(job_db):
+    db, profile = job_db
+    legacy = ResourceJob(
+        id="legacy-job", user_id=profile.user_id, job_type="discovery",
+        dedupe_key=f"{profile.user_id}:profile:{profile.profile_version}:discovery-v1",
+        status="completed", payload={"profile_version": profile.profile_version},
+        result={"vetted": 0, "coverage_gaps": []}, progress=100,
+    )
+    db.add(legacy)
+    db.commit()
+
+    current = ResourceJobService(db).enqueue_discovery(profile.user_id, profile.profile_version)
+
+    assert current.id != legacy.id
+    assert current.status == "queued"
+    assert current.dedupe_key.endswith("discovery-v2")
+
+
+def test_project_only_catalog_does_not_satisfy_instructional_coverage(job_db):
+    db, profile = job_db
+    requirement = db.query(LearnerGoalSkill).filter_by(
+        user_id=profile.user_id, profile_version=profile.profile_version,
+    ).order_by(LearnerGoalSkill.sequence).first()
+    for number in range(2):
+        resource = LearningResource(
+            id=f"project-{number}", provider="github", external_id=f"project-{number}",
+            canonical_key=f"github:project-{number}", resource_type="project",
+            title=f"Project {number}", url=f"https://github.com/example/project-{number}",
+            verification_status="vetted", resource_score=90, score_confidence=.9,
+            link_status="healthy", language="English", topics=[],
+        )
+        db.add(resource)
+        db.flush()
+        db.add(ResourceSkillMap(
+            id=f"project-map-{number}", resource_id=resource.id,
+            skill_id=requirement.skill_id, relevance_score=90, evidence={},
+        ))
+    db.commit()
+
+    coverage = ResourceCoverageService(db).analyze(profile.user_id, profile.profile_version)
+    item = next(entry for entry in coverage if entry.skill_id == requirement.skill_id)
+
+    assert item.eligible_count == 2
+    assert item.instructional_count == 0
+    assert item.covered is False
 
 
 def test_failed_jobs_retry_with_a_bound_and_remain_inspectable(job_db):
@@ -169,6 +217,7 @@ async def test_discovery_searches_only_gaps_and_persists_vetted_evidence(job_db)
 
     class Vetter:
         async def evaluate(self, candidate, context):
+            assert job.progress > 0
             return EvaluationResult(
                 relevance_score=92, content_quality_score=88, engagement_score=80, creator_score=75,
                 freshness_score=95, final_score=87, confidence=.8, status="vetted", model_version="test-model",
@@ -204,6 +253,42 @@ async def test_discovery_searches_only_gaps_and_persists_vetted_evidence(job_db)
     assert indexed.verification_status == "vetted"
     assert indexed.resource_score == 87
     assert db.query(ResourceEvaluation).filter_by(resource_id=indexed.id).count() == 2
+
+
+def test_current_evaluation_version_replaces_stale_resource_status(job_db):
+    db, _profile = job_db
+    skill = db.query(Skill).first()
+    resource = LearningResource(
+        id="versioned-video", provider="youtube", external_id="versioned-video",
+        canonical_key="youtube:versioned-video", resource_type="video", title="Versioned video",
+        url="https://youtube.com/watch?v=versioned-video", verification_status="vetted",
+        resource_score=95, score_confidence=.9, link_status="healthy", language="English", topics=[],
+    )
+    db.add(resource)
+    db.flush()
+    db.add(ResourceEvaluation(
+        id="legacy-evaluation", resource_id=resource.id,
+        evaluation_version="trellis-resource-score/legacy",
+        relevance_score=95, content_quality_score=95, engagement_score=95,
+        creator_score=95, freshness_score=95, final_score=95, confidence=.9,
+        model_version=None, input_fingerprint="legacy-fingerprint", evidence={},
+    ))
+    db.commit()
+    current = EvaluationResult(
+        relevance_score=50, content_quality_score=50, engagement_score=50,
+        creator_score=50, freshness_score=50, final_score=50, confidence=.8,
+        status="rejected", model_version="current-model", input_fingerprint="current-fingerprint",
+        transcript_available=False, coverage=[], evidence={},
+    )
+
+    ResourceDiscoveryService(db, object(), object())._persist_evaluation(resource, skill.id, current)
+    db.commit()
+    db.refresh(resource)
+
+    assert current.score_version == SCORE_VERSION
+    assert resource.verification_status == "rejected"
+    assert resource.resource_score == 50
+    assert resource.score_version == SCORE_VERSION
 
 
 @pytest.mark.asyncio

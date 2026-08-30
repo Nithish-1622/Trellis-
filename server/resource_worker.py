@@ -9,12 +9,13 @@ import uuid
 
 from config import settings
 from database import SessionLocal
+from logging_config import configure_logging
 from resource_jobs import ResourceDiscoveryService, ResourceJobService
 from resource_providers import get_hybrid_resource_provider
 from resource_vetting import get_resource_vetting_service
 
 
-logging.basicConfig(level=settings.LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+configure_logging(settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 

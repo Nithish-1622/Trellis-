@@ -2,11 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
+import resource_vetting
 
 from resource_providers import CreatorMetrics, ExternalResource, ResourceMetrics
 from resource_vetting import (
     ContentAnalysis,
     ResourceVettingService,
+    SCORE_VERSION,
     TranscriptClient,
     VettingContext,
     score_resource,
@@ -31,7 +33,7 @@ def strong_analysis() -> ContentAnalysis:
     )
 
 
-def test_score_v1_is_reproducible_and_promotes_strong_evidence():
+def test_current_score_is_reproducible_and_promotes_strong_evidence():
     context = VettingContext(skill="Spring Boot", target_level="intermediate", objective="Build APIs", freshness_class="fast_moving")
     now = datetime(2026, 8, 30, tzinfo=timezone.utc)
 
@@ -39,7 +41,7 @@ def test_score_v1_is_reproducible_and_promotes_strong_evidence():
     second = score_resource(youtube_candidate(published_at=now - timedelta(days=100)), context, strong_analysis(), now=now, transcript_available=True, llm_used=True)
 
     assert first == second
-    assert first.score_version == "trellis-resource-score/v1"
+    assert first.score_version == SCORE_VERSION
     assert first.status == "vetted"
     assert first.final_score >= 80
     assert first.confidence >= 0.45
@@ -51,6 +53,33 @@ def test_metadata_only_and_no_llm_confidence_are_capped():
     result = score_resource(youtube_candidate(), context, strong_analysis(), transcript_available=False, llm_used=False)
 
     assert result.confidence <= 0.45
+
+
+def test_groq_vetter_uses_strict_json_schema_for_gpt_oss(monkeypatch):
+    structured_calls = []
+
+    class FakeChatGroq:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def with_structured_output(self, schema, **kwargs):
+            structured_calls.append((schema, kwargs))
+            return object()
+
+    monkeypatch.setattr(resource_vetting, "ChatGroq", FakeChatGroq)
+    monkeypatch.setattr(resource_vetting.settings, "GROQ_API_KEY", "test-key")
+    monkeypatch.setattr(resource_vetting.settings, "GROQ_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setattr(resource_vetting.settings, "RESOURCE_VETTING_ENABLED", True)
+
+    ResourceVettingService()
+
+    assert structured_calls == [(ContentAnalysis, {"method": "json_schema", "strict": True})]
+
+
+def test_content_analysis_strict_schema_requires_every_property():
+    schema = ContentAnalysis.model_json_schema()
+
+    assert set(schema["required"]) == set(schema["properties"])
 
 
 def test_freshness_penalizes_fast_moving_topics_more_than_stable_topics():

@@ -27,7 +27,7 @@ export default function ResourceFeedbackControls({ resource, milestoneId }: { re
       })
       if (eventType === 'helpful' || eventType === 'not_helpful') {
         setSentiment(eventType)
-        setMessage('Thanks—your feedback was recorded.')
+        setMessage('Thank you for your feedback.')
       } else if (eventType === 'report') {
         setShowReport(false)
         setMessage('Report received. Trellis will reevaluate this resource.')

@@ -21,4 +21,15 @@ describe('waitForDiscovery', () => {
 
     await assertion
   })
+
+  it('rejects instead of treating a still-running job as complete at the deadline', async () => {
+    vi.useFakeTimers()
+    apiRequest.mockResolvedValue({ id: 'job-1', status: 'running', progress: 25 })
+
+    const result = waitForDiscovery('job-1', undefined, 45, 10)
+    const assertion = expect(result).rejects.toMatchObject({ name: 'TimeoutError' })
+    await vi.advanceTimersByTimeAsync(46)
+
+    await assertion
+  })
 })

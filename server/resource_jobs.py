@@ -30,6 +30,7 @@ from resource_vetting import EvaluationResult, ResourceVettingService, VettingCo
 
 
 logger = logging.getLogger(__name__)
+DISCOVERY_PIPELINE_VERSION = "v2"
 
 
 class Vetter(Protocol):
@@ -41,7 +42,7 @@ class ResourceJobService:
         self.db = db
 
     def enqueue_discovery(self, user_id: str, profile_version: int) -> ResourceJob:
-        dedupe_key = f"{user_id}:profile:{profile_version}:discovery-v1"
+        dedupe_key = f"{user_id}:profile:{profile_version}:discovery-{DISCOVERY_PIPELINE_VERSION}"
         existing = self.db.query(ResourceJob).filter_by(job_type="discovery", dedupe_key=dedupe_key).first()
         if existing:
             return existing
@@ -210,7 +211,12 @@ class ResourceDiscoveryService:
                 candidates = []
             if not candidates:
                 failed_skills.append(gap.skill)
-            for candidate in candidates:
+            candidate_count = max(len(candidates), 1)
+            for candidate_index, candidate in enumerate(candidates, start=1):
+                job.progress = min(max(round(((index - 1) + (candidate_index - 0.5) / candidate_count) / total * 100), 1), 99)
+                job.locked_at = datetime.utcnow()
+                job.updated_at = datetime.utcnow()
+                self.db.commit()
                 if self._conceptual_duplicate(candidate):
                     continue
                 resource = self._upsert_candidate(candidate)
@@ -230,6 +236,15 @@ class ResourceDiscoveryService:
                     rejected += 1
                 else:
                     discovered += 1
+                job.progress = min(round(((index - 1) + candidate_index / candidate_count) / total * 100), 99)
+                job.result = {
+                    "processed_skill_ids": sorted(processed_skill_ids), "discovered": discovered,
+                    "vetted": vetted, "rejected": rejected,
+                    "provider_gaps": list(dict.fromkeys(failed_skills)),
+                }
+                job.locked_at = datetime.utcnow()
+                job.updated_at = datetime.utcnow()
+                self.db.commit()
             job.progress = min(round(index / total * 100), 99)
             processed_skill_ids.add(gap.goal_skill_id)
             job.result = {
@@ -380,7 +395,10 @@ class ResourceDiscoveryService:
         mapping.evidence = {"score_version": evaluation.score_version, "coverage": evaluation.coverage}
         mapping.updated_at = datetime.utcnow()
         self.db.flush()
-        evaluations = self.db.query(ResourceEvaluation).filter_by(resource_id=resource.id).all()
+        evaluations = self.db.query(ResourceEvaluation).filter_by(
+            resource_id=resource.id,
+            evaluation_version=evaluation.score_version,
+        ).all()
         selected = max(evaluations, key=lambda item: item.final_score * (0.7 + 0.3 * item.confidence))
         safety_failed = any(bool((item.evidence or {}).get("safety_failure")) for item in evaluations)
         if resource.verification_status != "verified":

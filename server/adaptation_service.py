@@ -68,10 +68,10 @@ class AdaptationService:
         self.db.refresh(proposal)
         return self._response(proposal)
 
-    def pending(self, identity: AuthenticatedUser) -> AdaptationResponse:
+    def pending(self, identity: AuthenticatedUser) -> AdaptationResponse | None:
         proposal = self.db.query(AdaptationProposal).filter(AdaptationProposal.user_id == identity.user_id, AdaptationProposal.status == "pending").order_by(AdaptationProposal.created_at.desc()).first()
         if proposal is None:
-            raise APIError(status_code=404, code="ADAPTATION_NOT_FOUND", message="No pending adaptation was found")
+            return None
         return self._response(proposal)
 
     def accept(self, identity: AuthenticatedUser, proposal_id: str) -> AdaptationResponse:

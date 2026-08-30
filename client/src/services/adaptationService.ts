@@ -24,6 +24,6 @@ export const createAdaptation = (roadmapId: string, evidenceIds: string[]) =>
     method: 'POST', body: JSON.stringify({ evidence_ids: evidenceIds }),
   })
 
-export const getPendingAdaptation = () => apiRequest<AdaptationProposal>('/v1/adaptations/pending')
+export const getPendingAdaptation = () => apiRequest<AdaptationProposal | null>('/v1/adaptations/pending')
 export const acceptAdaptation = (proposalId: string) => apiRequest<AdaptationProposal>(`/v1/adaptations/${proposalId}/accept`, { method: 'POST', body: '{}' })
 export const rejectAdaptation = (proposalId: string, feedback?: string) => apiRequest<AdaptationProposal>(`/v1/adaptations/${proposalId}/reject`, { method: 'POST', body: JSON.stringify({ feedback: feedback || null }) })

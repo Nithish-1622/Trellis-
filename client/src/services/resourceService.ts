@@ -45,24 +45,18 @@ const getDiscoveryJobBefore = async (jobId: string, deadline: number) => {
 export const waitForDiscovery = async (
   jobId: string,
   onProgress?: (job: DiscoveryJob) => void,
-  timeoutMs = 45_000,
+  timeoutMs = 180_000,
   pollMs = 1_500,
 ) => {
   const deadline = Date.now() + timeoutMs
   let job: DiscoveryJob | undefined
   while (Date.now() < deadline) {
-    try {
-      job = await getDiscoveryJobBefore(jobId, deadline)
-    } catch (error) {
-      if (job && error instanceof DOMException && error.name === 'TimeoutError') return job
-      throw error
-    }
+    job = await getDiscoveryJobBefore(jobId, deadline)
     onProgress?.(job)
     if (['completed', 'dead'].includes(job.status)) return job
     const delay = Math.min(pollMs, Math.max(deadline - Date.now(), 0))
     await new Promise((resolve) => globalThis.setTimeout(resolve, delay))
   }
-  if (job) return job
   throw new DOMException('Discovery polling timed out', 'TimeoutError')
 }
 

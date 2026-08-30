@@ -17,7 +17,7 @@ from resource_providers import ExternalResource
 
 
 logger = logging.getLogger(__name__)
-SCORE_VERSION = "trellis-resource-score/v1"
+SCORE_VERSION = "trellis-resource-score/v2"
 _HALF_LIFE_YEARS = {"stable": 8.0, "moderate": 3.0, "fast_moving": 1.0}
 
 
@@ -36,7 +36,7 @@ class ContentAnalysis(BaseModel):
     prerequisite_fit: float = Field(ge=0, le=100)
     outdated_risk: float = Field(ge=0, le=100)
     promotional_content: float = Field(ge=0, le=100)
-    coverage: list[str] = Field(default_factory=list, max_length=30)
+    coverage: list[str] = Field(max_length=30)
 
 
 class TranscriptDocument(BaseModel):
@@ -214,8 +214,8 @@ class ResourceVettingService:
     def __init__(self, model: StructuredVettingModel | None = None, transcript_client: TranscriptClient | None = None) -> None:
         self.model = model
         if self.model is None and settings.GROQ_API_KEY and settings.RESOURCE_VETTING_ENABLED:
-            chat = ChatGroq(model=settings.GROQ_MODEL, api_key=settings.GROQ_API_KEY, temperature=0, timeout=10, max_retries=1)
-            self.model = chat.with_structured_output(ContentAnalysis)
+            chat = ChatGroq(model=settings.GROQ_MODEL, api_key=settings.GROQ_API_KEY, temperature=0, timeout=10, max_retries=0)
+            self.model = chat.with_structured_output(ContentAnalysis, method="json_schema", strict=True)
         self.transcript_client = transcript_client or TranscriptClient(settings.TRANSCRIPT_API_URL, settings.TRANSCRIPT_API_KEY)
 
     async def evaluate(self, candidate: ExternalResource, context: VettingContext) -> EvaluationResult:

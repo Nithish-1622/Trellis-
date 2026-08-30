@@ -64,6 +64,7 @@ describe('OnboardingWizard', () => {
     }))
     discoverResources.mockResolvedValue({ id: 'job-1', status: 'queued', progress: 0 })
     waitForDiscovery.mockResolvedValue({ id: 'job-1', status: 'completed', progress: 100 })
+    createRoadmap.mockResolvedValue({})
   })
 
   it('resumes a saved goal draft from the server', async () => {
@@ -203,5 +204,27 @@ describe('OnboardingWizard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Your profile is saved')
     expect(screen.getByRole('button', { name: 'Retry roadmap generation' })).toBeEnabled()
     expect(saveOnboarding).toHaveBeenCalledWith(expect.objectContaining({ complete: true }))
+  })
+
+  it('does not create a roadmap while resource discovery is still running', async () => {
+    getOnboarding.mockResolvedValue({
+      ...emptySession,
+      current_step: 'review',
+      completed_steps: ['goal', 'current_position', 'previous_learning', 'preferences'],
+      draft: {
+        goal: { free_text: 'Become a backend engineer this year', target_role: 'Backend Engineer', objective: 'Build reliable APIs', target_date: null },
+        current_position: { current_role: '', experience_years: 0, education_level: '', interests: [], skills: [] },
+        previous_learning: { courses: [] },
+        preferences: { preferred_formats: [], project_theory_balance: 50, learning_pace: 'steady', weekly_hours: 8, preferred_language: 'English', budget: null, accessibility_needs: [], preferred_session_minutes: 45 },
+      },
+    })
+    waitForDiscovery.mockRejectedValueOnce(new DOMException('Discovery polling timed out', 'TimeoutError'))
+    renderWizard()
+    await screen.findByRole('heading', { name: 'Review your learning profile' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and create roadmap' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your profile is saved')
+    expect(createRoadmap).not.toHaveBeenCalled()
   })
 })

@@ -46,6 +46,15 @@ def submit_quiz(client: TestClient, milestone_id: str, correct: bool) -> None:
     assert client.post(f"/v1/assessments/milestones/{milestone_id}/quiz-attempts", json={"answers": answers}).status_code == 201
 
 
+def test_no_pending_adaptation_is_a_successful_empty_lookup(adaptation_client):
+    client, _db, _context = adaptation_client
+
+    response = client.get("/v1/adaptations/pending")
+
+    assert response.status_code == 200
+    assert response.json() is None
+
+
 def test_weak_evidence_proposes_remediation_and_accepts_atomically(adaptation_client):
     client, db, context = adaptation_client
     submit_quiz(client, context["milestone_id"], correct=False)

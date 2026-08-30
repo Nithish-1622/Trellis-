@@ -23,6 +23,7 @@ from dashboard_api import router as dashboard_router
 from database import get_db
 from errors import register_error_handlers
 from learning_history_api import router as learning_history_router
+from logging_config import configure_logging
 from migration_runner import run_migrations
 from profile_api import router as profile_router
 from roadmap_api import router as roadmap_router
@@ -30,10 +31,7 @@ from operations_api import router as operations_router
 from telemetry import metrics
 
 
-logging.basicConfig(
-    level=settings.LOG_LEVEL,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+configure_logging(settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 

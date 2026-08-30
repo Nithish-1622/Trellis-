@@ -107,13 +107,14 @@ export default function OnboardingWizard() {
         setProfileSaved(true)
         try {
           setPreparationStatus('Checking your learning-resource coverage…')
-          try {
-            const job = await discoverResources()
-            await waitForDiscovery(job.id, (progress) => {
-              setPreparationStatus(`Checking resource quality and coverage… ${progress.progress}%`)
-            })
-          } catch {
-            setPreparationStatus('Live discovery is unavailable. Building from the Trellis resource index…')
+          const job = await discoverResources()
+          const discovery = await waitForDiscovery(job.id, (progress) => {
+            setPreparationStatus(`Checking resource quality and coverage… ${progress.progress}%`)
+          })
+          if (discovery.status !== 'completed') {
+            throw new Error(discovery.failure_code
+              ? `Resource discovery stopped (${discovery.failure_code}).`
+              : 'Resource discovery did not complete.')
           }
           await createRoadmap()
           navigate('/roadmap', { replace: true })

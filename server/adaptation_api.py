@@ -21,8 +21,8 @@ def create_adaptation(roadmap_id: str, request: AdaptationRequest, identity: Ann
     return AdaptationService(db).create(identity, roadmap_id, request)
 
 
-@adaptation_router.get("/pending", response_model=AdaptationResponse)
-def get_pending_adaptation(identity: Annotated[AuthenticatedUser, Depends(get_current_user)], db: Annotated[Session, Depends(get_db)]) -> AdaptationResponse:
+@adaptation_router.get("/pending", response_model=AdaptationResponse | None)
+def get_pending_adaptation(identity: Annotated[AuthenticatedUser, Depends(get_current_user)], db: Annotated[Session, Depends(get_db)]) -> AdaptationResponse | None:
     return AdaptationService(db).pending(identity)
 
 

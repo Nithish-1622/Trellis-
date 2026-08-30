@@ -60,6 +60,20 @@ def test_quiz_is_deterministic_and_attempt_creates_objective_evidence(assessment
     assert evidence.weight == 1.0
 
 
+def test_quizzes_are_specific_to_each_milestone(assessment_client):
+    client, _db, context = assessment_client
+    first, second = context["roadmap"]["milestones"][:2]
+
+    first_quiz = client.get(f"/v1/assessments/milestones/{first['id']}/quiz").json()
+    second_quiz = client.get(f"/v1/assessments/milestones/{second['id']}/quiz").json()
+
+    first_prompts = " ".join(item["prompt"] for item in first_quiz["questions"]).casefold()
+    second_prompts = " ".join(item["prompt"] for item in second_quiz["questions"]).casefold()
+    assert first_quiz["questions"] != second_quiz["questions"]
+    assert first["target_skills"][0].casefold() in first_prompts
+    assert second["target_skills"][0].casefold() in second_prompts
+
+
 def test_project_review_is_explicitly_provisional_and_weighted_lower(assessment_client):
     client, db, context = assessment_client
 

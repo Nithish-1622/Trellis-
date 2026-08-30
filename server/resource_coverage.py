@@ -10,6 +10,7 @@ from resource_policy import INELIGIBLE_LINK_STATUSES
 
 
 PRACTICAL_TYPES = {"project", "exercise", "assessment"}
+INSTRUCTIONAL_TYPES = {"course", "video", "article"}
 
 
 class SkillCoverage(BaseModel):
@@ -19,6 +20,7 @@ class SkillCoverage(BaseModel):
     covered: bool
     eligible_count: int
     practical_count: int
+    instructional_count: int
     required_count: int = 2
     practical_required: bool
 
@@ -54,11 +56,17 @@ class ResourceCoverageService:
                 ),
             ).all()
             practical_count = sum(resource.resource_type in PRACTICAL_TYPES for resource in resources)
+            instructional_count = sum(resource.resource_type in INSTRUCTIONAL_TYPES for resource in resources)
             practical_required = requirement.resource_intent == "project"
             output.append(SkillCoverage(
                 goal_skill_id=requirement.id, skill_id=skill.id, skill=skill.display_name,
-                covered=len(resources) >= 2 and (not practical_required or practical_count >= 1),
+                covered=(
+                    len(resources) >= 2
+                    and instructional_count >= 1
+                    and (not practical_required or practical_count >= 1)
+                ),
                 eligible_count=len(resources), practical_count=practical_count,
+                instructional_count=instructional_count,
                 practical_required=practical_required,
             ))
         return output
