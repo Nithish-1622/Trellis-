@@ -7,7 +7,7 @@ export interface AgentMessageResponse {
 export const sendMessageToAgent = async (userId: string, message: string, retries = 3, delay = 1000): Promise<string> => {
     for (let i = 0; i < retries; i++) {
         try {
-            // const response = await fetch('https://educat.saumyajit.dev/agent/message', {
+            // const response = await fetch('https://trellis.saumyajit.dev/agent/message', {
             const response = await fetch(`${API_BASE_URL}/agent/message`, {
                 method: 'POST',
                 headers: {
@@ -198,5 +198,4 @@ export const getInterviewReport = async (sessionId: string): Promise<any> => {
     if (!response.ok) throw new Error("Failed to get report");
     return await response.json();
 };
-
 

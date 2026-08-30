@@ -17,24 +17,24 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<any>({
-        $id: 'dev-user-001',
-        name: 'Development User',
-        email: 'dev@localhost.com',
-    });
-    const [loading, setLoading] = useState(false);
+    const [user, setUser] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    
+    useEffect(() => {
+        checkUserStatus();
+    }, []);
 
-   const checkUserStatus = async () => {
-    setUser({
-        $id: 'dev-user-001',
-        name: 'Development User',
-        email: 'dev@localhost.com',
-    });
-    setLoading(false);
-};
+    const checkUserStatus = async () => {
+        try {
+            const accountDetails = await account.get();
+            setUser(accountDetails);
+        } catch (error) {
+            setUser(null);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const login = async (email: string, password: string) => {
         setLoading(true);

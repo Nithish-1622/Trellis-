@@ -28,7 +28,7 @@ const Hero: React.FC<HeroProps> = ({ darkMode }) => {
                         </h1>
 
                         <p className={`text-lg sm:text-xl leading-relaxed mb-10 max-w-lg animate-fade-in-up animation-delay-200 opacity-0 ${darkMode ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                            Stop guessing. EducatAI analyzes your profile and architecturalizes a verified, precision-engineered roadmap for your professional growth.
+                            Stop guessing. Trellis analyzes your profile and architecturalizes a verified, precision-engineered roadmap for your professional growth.
                         </p>
 
                         <div className='flex flex-col sm:flex-row gap-4 animate-fade-in-up animation-delay-300 opacity-0 w-full sm:w-auto px-4 sm:px-0'>
@@ -54,7 +54,7 @@ const Hero: React.FC<HeroProps> = ({ darkMode }) => {
                                         <div className="w-3 h-3 rounded-full bg-amber-500/80"></div>
                                         <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
                                     </div>
-                                    <div className={`ml-4 text-xs font-mono opacity-50 ${darkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>educat-ai.app/roadmap</div>
+                                    <div className={`ml-4 text-xs font-mono opacity-50 ${darkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>trellis.app/roadmap</div>
                                 </div>
                                 {/* Dashboard Content */}
                                 <div className="p-6 grid grid-cols-12 gap-6 h-[400px]">

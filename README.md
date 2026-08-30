@@ -1,4 +1,4 @@
-# EducatAI - AI-Powered Career Mentorship Platform
+# Trellis - AI-Powered Career Mentorship Platform
 
 > An intelligent career mentorship platform that leverages AI agents to provide personalized guidance, job recommendations, and learning resources for career development.
 
@@ -6,17 +6,17 @@
 [![React](https://img.shields.io/badge/React-19.2-blue.svg)](https://react.dev/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Latest-purple.svg)](https://langchain-ai.github.io/langgraph/)
 [![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)](https://www.python.org/)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-orange.svg)](https://educat.appwrite.network)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-orange.svg)](https://trellis.appwrite.network)
 
 ## 🌐 Live Demo
 
-Check out the live application here: **[EducatAI](https://educat.appwrite.network)**
+Check out the live application here: **[Trellis](https://trellis.appwrite.network)**
 
-Backend API docs: **[API Docs](https://educat-api.saumyajit.dev/redoc)**
+Backend API docs: **[API Docs](https://trellis-api.saumyajit.dev/redoc)**
 
 ## 🎯 Overview
 
-EducatAI is a full-stack career mentorship platform that combines the power of AI agents, large language models, and real-time data to provide personalized career guidance. The platform helps users:
+Trellis is a full-stack career mentorship platform that combines the power of AI agents, large language models, and real-time data to provide personalized career guidance. The platform helps users:
 
 - 📄 **Parse and analyze resumes** to extract skills, experience, and qualifications
 - 💼 **Discover real job opportunities** from LinkedIn, Indeed, Glassdoor, and other platforms
@@ -27,7 +27,7 @@ EducatAI is a full-stack career mentorship platform that combines the power of A
 
 ## 🏗️ Architecture
 
-![System Architecture](./images/educat_architecture.png)
+![System Architecture](./images/trellis_architecture.png)
 
 ### Tech Stack
 
@@ -95,82 +95,76 @@ EducatAI is a full-stack career mentorship platform that combines the power of A
 
 ### Prerequisites
 
-### Prerequisites
-
-- **Docker & Docker Compose** (Recommended for Backend)
-- **Bun** (for Frontend)
+- **Docker & Docker Compose**
 - **API Keys**:
   - **Groq API Key** (for Llama 3.3 reasoning)
   - **Google Gemini API Key** (for Embeddings)
   - **JSearch API** (RapidAPI)
   - **Appwrite Project & Bucket ID**
 
-### Backend Setup (via Docker)
+### Docker Setup
 
 1.  **Clone the repository**
 
     ```bash
-    git clone https://github.com/agspades/educat-anokha.git
-    cd educat-anokha/server
+    git clone https://github.com/agspades/trellis.git
+    cd trellis
     ```
 
-2.  **Configure Environment**
+2.  **Configure the backend and frontend environments**
 
     ```bash
-    cp .env.example .env
+    cp server/.env.example server/.env
+    cp client/.env.example client/.env
     ```
 
-    Edit `.env` with your API keys (Groq, Google, JSearch).
-    *Note: Docker Compose will automatically handle the database connection.*
+    Add your API keys to `server/.env` and your Appwrite public configuration
+    to `client/.env`. Compose supplies the PostgreSQL connection and browser API
+    proxy settings, so those do not need to be changed in either file.
 
-3.  **Run with Docker Compose**
+3.  **Run the production stack**
 
     ```bash
     docker compose up -d --build
     ```
 
-4.  The API will be available at `http://localhost:8085` (exposed port)
-    *   API Documentation: `http://localhost:8085/docs`
+    - Trellis: `http://localhost:8098`
+    - API: `http://localhost:8088`
+    - API docs: `http://localhost:8088/docs`
+    - PostgreSQL is only reachable by other containers.
 
-    *Note: The internal container port is 8000, mapped to 8085 on host to avoid conflicts.*
+    The client forwards `/api/*` requests to the internal API service. Stop the
+    stack with `docker compose down`. Database data remains in the `pgdata`
+    named volume; use `docker compose down --volumes` only when you intend to
+    delete it.
 
-The API will be available at `http://localhost:8000`
+4.  **Run the live-reload development stack**
 
-- API Documentation: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+    ```bash
+    docker compose -f compose.yaml -f compose.dev.yaml up --build
+    ```
 
-### Frontend Setup
+    - Vite client with HMR: `http://localhost:5173`
+    - Reloading API: `http://localhost:8085`
+    - API docs: `http://localhost:8085/docs`
+    - PostgreSQL: `localhost:5432`
 
-1. **Navigate to client directory**
+    Changes under `client/` and `server/` are bind-mounted into their respective
+    containers. Stop this stack with:
 
-```bash
-cd ../client
-```
+    ```bash
+    docker compose -f compose.yaml -f compose.dev.yaml down
+    ```
 
-2. **Install dependencies**
+    The same workflows are available as shorter Make targets:
 
-```bash
-bun install
-```
-
-3. **Configure Environment** 
-   Create `.env` file in `client/` directory:
-
-```env
-VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-VITE_APPWRITE_PROJECT_ID=your_project_id
-VITE_APPWRITE_BUCKET_ID=your_storage_bucket_id
-VITE_API_BASE_URL=http://localhost:8085
-```
-*(Note: VITE_API_BASE_URL should point to 8085 if using Docker backend)*
-
-4. **Run development server**
-
-```bash
-bun dev
-```
-
-The frontend will be available at `http://localhost:5173`
+    ```bash
+    make prod       # production
+    make dev        # development with live reload
+    make down       # stop production
+    make dev-down   # stop development
+    make help       # list all shortcuts
+    ```
 
 ## 📡 API Endpoints
 
@@ -267,7 +261,7 @@ curl -X POST http://localhost:8000/agent/jobs/recommend \
 ## 📁 Project Structure
 
 ```
-educat-anokha/
+trellis/
 ├── client/                    # React frontend
 │   ├── src/
 │   │   ├── pages/            # Page components
@@ -346,7 +340,7 @@ JSEARCH_API_KEY = "..."
 JSEARCH_API_HOST = "jsearch.p.rapidapi.com"
 
 # Application
-APP_NAME = "EducatAI Career Mentor"
+APP_NAME = "Trellis Career Mentor"
 LOG_LEVEL = "INFO"
 ```
 
@@ -366,8 +360,8 @@ LOG_LEVEL = "INFO"
 ### Database Connection Error
 
 - **Check**: PostgreSQL is running (`sudo systemctl status postgresql`)
-- **Check**: Database exists (`psql -l | grep educat_db`)
-- **Check**: pgvector extension installed (`psql educat_db -c "\dx"`)
+- **Check**: Database exists (`psql -l | grep trellis_db`)
+- **Check**: pgvector extension installed (`psql trellis_db -c "\dx"`)
 
 ### Import Errors
 
@@ -421,7 +415,7 @@ For questions or issues:
 
 - Open an issue on GitHub
 - Check the [documentation](server/docs/)
-- Review API docs here: [API Docs](https://educat-api.saumyajit.dev/redoc)
+- Review API docs here: [API Docs](https://trellis-api.saumyajit.dev/redoc)
 
 ---
 

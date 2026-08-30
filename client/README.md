@@ -1,2 +1,2 @@
-# educat-anokha
+# trellis
 An AI Career Development Assistant
