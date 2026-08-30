@@ -33,6 +33,9 @@ from resume_parser import resume_parser
 from job_recommender import job_engine
 from learning_resources import learning_resources
 from interview_agent import get_interview_agent
+from auth import AuthenticatedUser, get_current_user
+from errors import register_error_handlers
+from typing import Annotated
 
 # Configure logging
 logging.basicConfig(
@@ -49,6 +52,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+register_error_handlers(app)
 
 # CORS middleware
 app.add_middleware(
@@ -108,6 +112,14 @@ async def health_check():
         version=settings.APP_VERSION,
         timestamp=datetime.utcnow()
     )
+
+
+@app.get("/v1/auth/session", response_model=AuthenticatedUser)
+async def authenticated_session(
+    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+):
+    """Return the identity and roles derived from a validated Appwrite JWT."""
+    return user
 
 
 # ============== Protected Endpoints ==============

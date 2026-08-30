@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     # API
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
+
+    # Identity
+    APPWRITE_ENDPOINT: str = ""
+    APPWRITE_PROJECT_ID: str = ""
+    APPWRITE_AUTH_TIMEOUT_SECONDS: float = 5.0
+    ADMIN_USER_IDS: str = ""
     
     # Database
     DATABASE_URL: str = "sqlite:///./career_mentor.db"
@@ -55,6 +61,11 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins into a list."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def admin_user_ids(self) -> set[str]:
+        """Parse the configured bootstrap administrator identifiers."""
+        return {user_id.strip() for user_id in self.ADMIN_USER_IDS.split(",") if user_id.strip()}
     
     class Config:
         env_file = ".env"
