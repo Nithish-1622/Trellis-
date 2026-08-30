@@ -76,5 +76,5 @@ class Settings(BaseSettings):
     def admin_user_ids(self) -> set[str]:
         """Parse the configured bootstrap administrator identifiers."""
         return {user_id.strip() for user_id in self.ADMIN_USER_IDS.split(",") if user_id.strip()}
-    
+
 settings = Settings()

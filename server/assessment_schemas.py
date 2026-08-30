@@ -56,4 +56,3 @@ class AssessmentAttemptResponse(BaseModel):
     provisional: bool
     reflection: str | None
     created_at: datetime
-

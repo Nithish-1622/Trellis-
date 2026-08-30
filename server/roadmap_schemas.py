@@ -53,4 +53,3 @@ class MilestoneProgressUpdate(BaseModel):
 
 class MilestoneCompletion(BaseModel):
     reflection: str | None = Field(default=None, max_length=5000)
-
