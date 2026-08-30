@@ -28,6 +28,7 @@ def test_alembic_baseline_upgrades_and_downgrades_clean_database(tmp_path):
         "learner_skills",
         "learning_history",
         "skill_evidence",
+        "learning_resources",
         "alembic_version",
     }.issubset(inspect(engine).get_table_names())
 

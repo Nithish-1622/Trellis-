@@ -191,6 +191,40 @@ class SkillEvidence(Base):
     skill = relationship("Skill")
 
 
+class LearningResource(Base):
+    """Verified or provider-sourced learning material eligible for recommendations."""
+    __tablename__ = "learning_resources"
+    __table_args__ = (
+        UniqueConstraint("provider", "external_id", name="uq_learning_resource_provider_external"),
+        Index("ix_learning_resources_catalog", "verification_status", "archived_at", "resource_type"),
+    )
+
+    id = Column(String, primary_key=True)
+    provider = Column(String, nullable=False)
+    external_id = Column(String, nullable=True)
+    resource_type = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    level = Column(String, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    topics = Column(JSON, nullable=False, default=list)
+    prerequisites = Column(JSON, nullable=False, default=list)
+    cost_type = Column(String, nullable=False, default="free")
+    price = Column(Float, nullable=True)
+    currency = Column(String, nullable=True)
+    language = Column(String, nullable=False, default="English")
+    url = Column(String, nullable=False)
+    thumbnail_url = Column(String, nullable=True)
+    verification_status = Column(String, nullable=False, default="pending")
+    verified_by = Column(String, nullable=True)
+    verified_at = Column(DateTime, nullable=True)
+    archived_at = Column(DateTime, nullable=True)
+    link_status = Column(String, nullable=False, default="unchecked")
+    resource_metadata = Column("metadata", JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Memory(Base):
     """Episodic & semantic memory entries."""
     __tablename__ = "memories"
