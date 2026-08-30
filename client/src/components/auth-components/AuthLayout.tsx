@@ -3,11 +3,7 @@ import type { ReactNode } from 'react';
 import { useThemeContext } from '../../contexts/ThemeContext';
 import BackgroundGradients from '../landing-page-components/BackgroundGradients';
 import ThemeToggle from '../landing-page-components/ThemeToggle';
-<<<<<<< HEAD
-import ecaiLogo from '../../assets/ecai.png';
-=======
 import trellisLogo from '../../assets/trellis.png';
->>>>>>> 4dbc6f897430e46b54b20b67323e21f0a7267c9a
 
 interface AuthLayoutProps {
     children: ReactNode;
@@ -35,17 +31,10 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({
                     <a href="/" className='flex items-center gap-3 cursor-pointer group'>
                         <div className="relative">
                             <div className={`absolute inset-0 rounded-full blur opacity-40 group-hover:opacity-60 transition-opacity duration-500 ${darkMode ? 'bg-indigo-500' : 'bg-indigo-400'}`}></div>
-<<<<<<< HEAD
-                            <img src={ecaiLogo} alt="Educat-AI" className='relative h-10 w-auto' />
-                        </div>
-                        <span className={`font-bold text-2xl tracking-tight transition-colors duration-300 ${darkMode ? 'text-white' : 'text-zinc-900'}`}>
-                            Educat<span className="text-indigo-500">AI</span>
-=======
                             <img src={trellisLogo} alt="Trellis" className='relative h-10 w-auto' />
                         </div>
                         <span className={`font-bold text-2xl tracking-tight transition-colors duration-300 ${darkMode ? 'text-white' : 'text-zinc-900'}`}>
                             Trellis
->>>>>>> 4dbc6f897430e46b54b20b67323e21f0a7267c9a
                         </span>
                     </a>
                 </div>
