@@ -166,7 +166,7 @@ class RoadmapService:
                 self.db.add(activity)
             activity.progress_percentage = update.progress_percentage
             activity.status = milestone.status
-            activity.time_spent_minutes += update.time_spent_minutes
+            activity.time_spent_minutes = (activity.time_spent_minutes or 0) + update.time_spent_minutes
             activity.usefulness_rating = update.usefulness_rating
             activity.difficulty_rating = update.difficulty_rating
             activity.started_at = activity.started_at or datetime.utcnow()
