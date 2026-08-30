@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     YOUTUBE_API_KEY: str = ""
     GITHUB_TOKEN: str = ""
     PROVIDER_TIMEOUT_SECONDS: float = 8.0
+    RESOURCE_DISCOVERY_PROVIDER_LIMIT: int = 10
+    YOUTUBE_MIN_DURATION_SECONDS: int = 120
+    YOUTUBE_MAX_DURATION_SECONDS: int = 14400
     
     # LangSmith (Optional)
     LANGCHAIN_TRACING_V2: bool = False
