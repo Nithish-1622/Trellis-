@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const { getCurrentRoadmap, createRoadmap, updateMilestoneProgress, completeMilestone } = vi.hoisted(() => ({
   getCurrentRoadmap: vi.fn(), createRoadmap: vi.fn(), updateMilestoneProgress: vi.fn(), completeMilestone: vi.fn(),
 }))
+const { getPendingAdaptation, createAdaptation, acceptAdaptation, rejectAdaptation } = vi.hoisted(() => ({ getPendingAdaptation: vi.fn(), createAdaptation: vi.fn(), acceptAdaptation: vi.fn(), rejectAdaptation: vi.fn() }))
 
 vi.mock('../services/roadmapService', () => ({ getCurrentRoadmap, createRoadmap, updateMilestoneProgress, completeMilestone }))
+vi.mock('../services/adaptationService', () => ({ getPendingAdaptation, createAdaptation, acceptAdaptation, rejectAdaptation }))
 vi.mock('../hooks/useThemeContext', () => ({ useThemeContext: () => ({ darkMode: false, toggleTheme: vi.fn() }) }))
 
 import Roadmap from './Roadmap'
@@ -24,7 +26,7 @@ const roadmap = {
 }
 
 describe('Roadmap page', () => {
-  beforeEach(() => { vi.clearAllMocks(); getCurrentRoadmap.mockResolvedValue(roadmap) })
+  beforeEach(() => { vi.clearAllMocks(); getCurrentRoadmap.mockResolvedValue(roadmap); getPendingAdaptation.mockResolvedValue(null) })
 
   it('shows explained milestones and only provider-backed resource links', async () => {
     render(<MemoryRouter><Roadmap /></MemoryRouter>)
