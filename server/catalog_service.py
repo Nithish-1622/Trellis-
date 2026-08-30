@@ -10,11 +10,13 @@ from sqlalchemy.orm import Session
 from auth import AuthenticatedUser
 from catalog_schemas import (
     RecommendationPage,
+    ImportResult,
     ResourceCreate,
     ResourcePage,
     ResourceRecommendation,
     ResourceResponse,
     ResourceUpdate,
+    ResourceBulkCreate,
 )
 from database import LearningHistory, LearningResource
 from errors import APIError
@@ -45,6 +47,51 @@ class CatalogService:
         except IntegrityError as exc:
             self.db.rollback()
             raise APIError(status_code=409, code="RESOURCE_DUPLICATE", message="This provider resource already exists") from exc
+        self.db.refresh(resource)
+        return ResourceResponse.model_validate(resource)
+
+    def bulk_create(self, admin: AuthenticatedUser, payload: ResourceBulkCreate) -> ImportResult:
+        created: list[ResourceResponse] = []
+        skipped = 0
+        for item in payload.resources:
+            existing = None
+            if item.external_id:
+                existing = self.db.query(LearningResource).filter(
+                    LearningResource.provider == item.provider,
+                    LearningResource.external_id == item.external_id,
+                ).first()
+            if existing:
+                skipped += 1
+                continue
+            data = item.model_dump(mode="json")
+            resource = LearningResource(id=str(uuid.uuid4()))
+            self._apply(resource, data, admin.user_id)
+            self.db.add(resource)
+            self.db.flush()
+            created.append(ResourceResponse.model_validate(resource))
+        self.db.commit()
+        return ImportResult(created=len(created), skipped=skipped, items=created)
+
+    def sync_external(self, admin: AuthenticatedUser, items: list[ExternalResource]) -> ImportResult:
+        payloads: list[ResourceCreate] = []
+        allowed_types = {"course", "video", "project", "article", "assessment"}
+        for item in items:
+            if item.resource_type not in allowed_types:
+                continue
+            payloads.append(ResourceCreate(
+                provider=item.provider, external_id=item.external_id, resource_type=item.resource_type,
+                title=item.title, description=item.description, topics=item.topics, url=item.url,
+                thumbnail_url=item.thumbnail_url, language=item.language, verification_status="pending",
+                metadata={**item.metadata, "provider_synced": True},
+            ))
+        if not payloads:
+            return ImportResult(created=0, skipped=0, items=[])
+        return self.bulk_create(admin, ResourceBulkCreate(resources=payloads))
+
+    def set_link_status(self, resource_id: str, link_status: str) -> ResourceResponse:
+        resource = self._get(resource_id)
+        resource.link_status = link_status
+        self.db.commit()
         self.db.refresh(resource)
         return ResourceResponse.model_validate(resource)
 

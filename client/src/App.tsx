@@ -10,6 +10,7 @@ import Roadmap from './pages/Roadmap';
 import Jobs from './pages/Jobs';
 import Chat from './pages/Chat';
 import InterviewPrep from './pages/InterviewPrep';
+import AdminCatalog from './pages/AdminCatalog';
 
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth-components/ProtectedRoute';
@@ -29,6 +30,7 @@ function App() {
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/practice" element={<InterviewPrep />} />
+            <Route path="/admin/resources" element={<AdminCatalog />} />
           </Route>
         </Routes>
       </AuthProvider>

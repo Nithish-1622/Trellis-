@@ -98,3 +98,18 @@ class RecommendationPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ResourceBulkCreate(BaseModel):
+    resources: list[ResourceCreate] = Field(min_length=1, max_length=500)
+
+
+class ProviderSyncRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=200)
+    limit: int = Field(default=10, ge=1, le=25)
+
+
+class ImportResult(BaseModel):
+    created: int
+    skipped: int
+    items: list[ResourceResponse]

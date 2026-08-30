@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
 from database import Base, LearningResource, get_db
+from catalog_api import get_link_checker
 from main import app
 from resource_providers import ExternalResource, get_hybrid_resource_provider
 
@@ -144,3 +145,40 @@ def test_recommendations_merge_validated_live_resources_and_keep_catalog_fallbac
     assert response.status_code == 200
     provenances = {item["provenance"] for item in response.json()["items"]}
     assert provenances == {"verified_catalog", "youtube"}
+
+
+def test_admin_can_bulk_import_and_sync_provider_preview(catalog_client):
+    client, db, _identity = catalog_client
+    second = {**resource_payload(), "external_id": "python-api-201", "title": "Advanced API Reliability", "url": "https://academy.example.test/python-api-201"}
+
+    bulk = client.post("/v1/admin/resources/bulk", json={"resources": [resource_payload(), second]})
+    assert bulk.status_code == 201
+    assert bulk.json()["created"] == 2
+
+    class StubProvider:
+        async def search(self, query: str, limit: int):
+            return [ExternalResource(provider="github", external_id="123", resource_type="project", title="example/backend-project", url="https://github.com/example/backend-project", topics=["APIs"])]
+
+    app.dependency_overrides[get_hybrid_resource_provider] = lambda: StubProvider()
+    synced = client.post("/v1/admin/resources/provider-sync", json={"query": "backend APIs", "limit": 5})
+    assert synced.status_code == 201
+    assert synced.json()["created"] == 1
+    external = db.query(LearningResource).filter(LearningResource.provider == "github").one()
+    assert external.verification_status == "pending"
+
+
+def test_admin_link_check_persists_status_without_exposing_provider_error(catalog_client):
+    client, db, _identity = catalog_client
+    resource_id = client.post("/v1/admin/resources", json=resource_payload()).json()["id"]
+
+    class StubChecker:
+        async def check(self, url: str) -> str:
+            assert url.startswith("https://")
+            return "healthy"
+
+    app.dependency_overrides[get_link_checker] = lambda: StubChecker()
+    response = client.post(f"/v1/admin/resources/{resource_id}/check-link")
+
+    assert response.status_code == 200
+    assert response.json()["link_status"] == "healthy"
+    assert db.get(LearningResource, resource_id).link_status == "healthy"
