@@ -162,3 +162,51 @@ async def test_provider_outage_completes_job_with_inspectable_coverage_gap(job_d
     assert job.status == "completed"
     assert job.result["coverage_gaps"]
     assert job.last_error_code is None
+
+
+@pytest.mark.asyncio
+async def test_discovery_never_overwrites_human_verified_resource(job_db):
+    db, profile = job_db
+    requirement = db.query(LearnerGoalSkill).filter_by(
+        user_id=profile.user_id, profile_version=profile.profile_version,
+    ).order_by(LearnerGoalSkill.sequence).first()
+    resource = LearningResource(
+        id="verified-video", provider="youtube", external_id="trusted", canonical_key="youtube:trusted",
+        resource_type="video", title="Human reviewed title", description="Reviewed description",
+        url="https://www.youtube.com/watch?v=trusted", author="Trusted teacher",
+        verification_status="verified", link_status="healthy", language="English", topics=["reviewed"],
+        resource_metadata={"curator_note": "keep this"},
+    )
+    db.add(resource)
+    db.commit()
+
+    class Provider:
+        async def search(self, _request, _limit):
+            return [ExternalResource(
+                provider="youtube", external_id="trusted", resource_type="video",
+                title="Provider changed title", description="Provider changed description",
+                url="https://youtu.be/trusted", author="Changed teacher", topics=["changed"],
+            )]
+
+    class Vetter:
+        async def evaluate(self, _candidate, context):
+            return EvaluationResult(
+                relevance_score=90, content_quality_score=85, engagement_score=80, creator_score=75,
+                freshness_score=90, final_score=85, confidence=.7, status="vetted", model_version="test",
+                input_fingerprint=(f"verified-{context.skill}" * 8)[:64], coverage=[context.skill], evidence={},
+                transcript_available=False,
+            )
+
+    jobs = ResourceJobService(db)
+    jobs.enqueue_discovery(profile.user_id, profile.profile_version)
+    await ResourceDiscoveryService(db, Provider(), Vetter()).run(jobs.claim_next("worker"))
+    db.refresh(resource)
+
+    assert resource.title == "Human reviewed title"
+    assert resource.description == "Reviewed description"
+    assert resource.author == "Trusted teacher"
+    assert resource.url == "https://www.youtube.com/watch?v=trusted"
+    assert resource.topics == ["reviewed"]
+    assert resource.resource_metadata == {"curator_note": "keep this"}
+    assert resource.verification_status == "verified"
+    assert db.query(ResourceSkillMap).filter_by(resource_id=resource.id, skill_id=requirement.skill_id).one()

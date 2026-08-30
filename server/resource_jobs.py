@@ -292,6 +292,11 @@ class ResourceDiscoveryService:
         if resource is None:
             resource = LearningResource(id=str(uuid.uuid4()), canonical_key=candidate.canonical_key)
             self.db.add(resource)
+        elif resource.verification_status == "verified":
+            # Provider discovery may refresh score evidence, but a remote payload must
+            # never replace content that a human explicitly reviewed and trusted.
+            self.db.flush()
+            return resource
         resource.provider = candidate.provider
         resource.external_id = candidate.external_id
         resource.resource_type = candidate.resource_type
@@ -349,6 +354,8 @@ class ResourceDiscoveryService:
         self.db.flush()
 
     def _conceptual_duplicate(self, candidate: ExternalResource) -> bool:
+        if self.db.query(LearningResource.id).filter_by(canonical_key=candidate.canonical_key).first():
+            return False
         normalized_title = re.sub(r"\W+", " ", candidate.title.casefold()).strip()
         if not normalized_title or not candidate.author:
             return False
