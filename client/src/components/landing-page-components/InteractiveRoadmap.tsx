@@ -25,14 +25,14 @@ const steps = [
         title: 'Generate Path',
         icon: '🗺️',
         desc: 'Receive a step-by-step verifiable roadmap.',
-        details: 'Your roadmap is dynamic. As you verify skills on-chain, the AI adapts future nodes to keep you on the fastest track.'
+        details: 'Your roadmap is dynamic. As assessments and project evidence demonstrate growth, Trellis proposes focused updates for your approval.'
     },
     {
         id: 4,
         title: 'Earn & Verify',
         icon: '🏆',
-        desc: 'Complete milestones and mint proof of skill.',
-        details: 'Turn your learning into a verifiable on-chain resume that employers trust more than a PDF.'
+        desc: 'Complete milestones and build proof of skill.',
+        details: 'Turn your learning into a practical evidence trail of completed projects, assessments, and demonstrated skill growth.'
     }
 ];
 

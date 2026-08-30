@@ -10,7 +10,6 @@ import Roadmap from './pages/Roadmap';
 import Jobs from './pages/Jobs';
 import Chat from './pages/Chat';
 import InterviewPrep from './pages/InterviewPrep';
-import ComingSoonNFT from './pages/nft/ComingSoonNFT';
 
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth-components/ProtectedRoute';
@@ -30,7 +29,6 @@ function App() {
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/practice" element={<InterviewPrep />} />
-            <Route path="/nft" element={<ComingSoonNFT />} />
           </Route>
         </Routes>
       </AuthProvider>
