@@ -4,8 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 import { Link } from 'react-router-dom';
 import Jobs3DVisual from '../components/jobs-components/Jobs3DVisual';
-import { recommendJobs } from '../services/agentService';
-import type { SalaryRange } from '../services/agentService';
+import { getRecommendedJobs } from '../services/careerService';
+import type { SalaryRange } from '../services/careerService';
 
 const logoColors = [
     'from-blue-500 to-cyan-500',
@@ -81,10 +81,10 @@ const Jobs: React.FC = () => {
 
             try {
                 setLoading(true);
-                const data = await recommendJobs(user.$id);
+                const data = await getRecommendedJobs();
                 // Map API response to Job interface
-                const mappedJobs: Job[] = data.jobs.map((job, index) => ({
-                    id: job.url || index.toString(), // Use URL or index as ID
+                const mappedJobs: Job[] = data.items.map((job, index) => ({
+                    id: job.id || index.toString(),
                     title: job.title,
                     company: job.company,
                     location: job.location,

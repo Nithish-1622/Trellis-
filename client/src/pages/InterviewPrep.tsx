@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useThemeContext } from '../hooks/useThemeContext';
 import { useAuth } from '../hooks/useAuth';
-import { startInterview, submitInterviewAnswer, getInterviewReport } from '../services/agentService';
-import type { InterviewReport } from '../services/agentService';
+import { startInterview, submitInterviewAnswer, getInterviewReport } from '../services/careerService';
+import type { InterviewReport } from '../services/careerService';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 
 const InterviewPrep: React.FC = () => {
@@ -36,9 +36,9 @@ const InterviewPrep: React.FC = () => {
 
         setIsLoading(true);
         try {
-            const data = await startInterview(user.$id, targetRole, focusArea);
+            const data = await startInterview(targetRole, focusArea);
             setSessionId(data.session_id);
-            setCurrentQuestion(data.question);
+            setCurrentQuestion(data.question || 'Interview complete.');
             setStage('interview');
             setQuestionCount(1);
         } catch (error) {
@@ -53,7 +53,7 @@ const InterviewPrep: React.FC = () => {
         if (!user || !userAnswer.trim()) return;
         setIsLoading(true);
         try {
-            const data = await submitInterviewAnswer(user.$id, sessionId!, userAnswer);
+            const data = await submitInterviewAnswer(sessionId!, userAnswer);
 
             // Update feedback from previous turn
             if (data.previous_feedback) {
@@ -63,10 +63,10 @@ const InterviewPrep: React.FC = () => {
                 });
             }
 
-            if (data.state === 'completed') {
+            if (data.status === 'completed') {
                 await fetchReport(data.session_id);
             } else {
-                setCurrentQuestion(data.question);
+                setCurrentQuestion(data.question || 'Interview complete.');
                 setUserAnswer("");
                 setQuestionCount(prev => prev + 1);
             }
@@ -202,7 +202,7 @@ const InterviewPrep: React.FC = () => {
                         <div className={`text-center p-10 rounded-3xl border ${darkMode ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-zinc-100'}`}>
                             <h2 className="text-2xl font-bold mb-2">Interview Completed!</h2>
                             <div className="text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500 mb-4">
-                                {report.overall_score}
+                                {Math.round((report.overall_score || 0) * 100)}
                             </div>
                             <p className="text-sm uppercase tracking-widest opacity-60">Overall Score</p>
                             <p className="mt-6 max-w-2xl mx-auto opacity-80 leading-relaxed">

@@ -44,6 +44,7 @@ from assessment_api import router as assessment_router
 from adaptation_api import adaptation_router, roadmap_router as adaptation_roadmap_router
 from dashboard_api import router as dashboard_router
 from chat_api import router as chat_router
+from career_api import router as career_router
 from typing import Annotated
 
 # Configure logging
@@ -72,6 +73,7 @@ app.include_router(adaptation_roadmap_router)
 app.include_router(adaptation_router)
 app.include_router(dashboard_router)
 app.include_router(chat_router)
+app.include_router(career_router)
 
 # CORS middleware
 app.add_middleware(
