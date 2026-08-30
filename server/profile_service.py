@@ -14,6 +14,7 @@ from database import (
     OnboardingSession,
     Skill,
     SkillAlias,
+    SkillEvidence,
     UserProfile,
     UserRole,
 )
@@ -196,24 +197,7 @@ class LearnerProfileService:
                 self._upsert_history(profile.user_id, course.model_dump())
 
     def _upsert_skill(self, user_id: str, skill_draft) -> None:
-        canonical_name = _canonicalize_skill_name(skill_draft.name)
-        alias = self.db.query(SkillAlias).filter(SkillAlias.alias == canonical_name).first()
-        skill = alias.skill if alias else None
-        if skill is None:
-            skill = self.db.query(Skill).filter(Skill.canonical_name == canonical_name).first()
-        if skill is None:
-            skill = Skill(
-                id=str(uuid.uuid4()),
-                canonical_name=canonical_name,
-                display_name=skill_draft.name.strip(),
-            )
-            self.db.add(skill)
-            self.db.flush()
-            self.db.add(
-                SkillAlias(id=str(uuid.uuid4()), skill_id=skill.id, alias=canonical_name)
-            )
-            self.db.flush()
-
+        skill = self._resolve_skill(skill_draft.name)
         learner_skill = (
             self.db.query(LearnerSkill)
             .filter(
@@ -232,6 +216,64 @@ class LearnerProfileService:
         learner_skill.confidence = 0.5
         learner_skill.source = skill_draft.evidence_source
         learner_skill.evidence_url = skill_draft.evidence_url
+
+    def _resolve_skill(self, name: str) -> Skill:
+        canonical_name = _canonicalize_skill_name(name)
+        alias = self.db.query(SkillAlias).filter(SkillAlias.alias == canonical_name).first()
+        skill = alias.skill if alias else None
+        if skill is None:
+            skill = self.db.query(Skill).filter(Skill.canonical_name == canonical_name).first()
+        if skill is None:
+            skill = Skill(
+                id=str(uuid.uuid4()),
+                canonical_name=canonical_name,
+                display_name=name.strip(),
+            )
+            self.db.add(skill)
+            self.db.flush()
+            self.db.add(
+                SkillAlias(id=str(uuid.uuid4()), skill_id=skill.id, alias=canonical_name)
+            )
+            self.db.flush()
+        return skill
+
+    def add_resume_evidence(self, user_id: str, names: list[str]) -> list[str]:
+        added: list[str] = []
+        seen: set[str] = set()
+        for name in names:
+            canonical = _canonicalize_skill_name(name)
+            if not canonical or canonical in seen:
+                continue
+            seen.add(canonical)
+            skill = self._resolve_skill(name)
+            learner_skill = self.db.query(LearnerSkill).filter(
+                LearnerSkill.user_id == user_id,
+                LearnerSkill.skill_id == skill.id,
+            ).first()
+            if learner_skill is None:
+                learner_skill = LearnerSkill(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    skill_id=skill.id,
+                    display_name=name.strip(),
+                    proficiency="beginner",
+                    confidence=0.35,
+                    source="resume",
+                )
+                self.db.add(learner_skill)
+                added.append(name.strip())
+            self.db.add(SkillEvidence(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                skill_id=skill.id,
+                evidence_type="resume_mention",
+                source_type="resume",
+                confidence=0.35,
+                weight=0.4,
+                rationale="Skill was identified in the learner's uploaded resume.",
+                evidence_metadata={},
+            ))
+        return added
 
     def _upsert_history(self, user_id: str, course: dict) -> None:
         existing = (

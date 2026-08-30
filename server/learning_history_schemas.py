@@ -60,3 +60,11 @@ class CsvImportResponse(BaseModel):
     duplicate_count: int
     rows: list[CsvPreviewRow]
 
+
+class ResumeEvidenceResponse(BaseModel):
+    filename: str
+    skills_found: list[str]
+    skills_added: list[str]
+    evidence_count: int
+    education_count: int
+    experience_count: int

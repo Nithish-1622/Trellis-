@@ -1,8 +1,8 @@
 """Authenticated history import and resume-evidence endpoints."""
 
-from typing import Annotated
+from typing import Annotated, Protocol
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from auth import AuthenticatedUser, get_current_user
@@ -14,8 +14,26 @@ from learning_history_schemas import (
     LearningHistoryCreate,
     LearningHistoryPage,
     LearningHistoryResponse,
+    ResumeEvidenceResponse,
 )
 from learning_history_service import LearningHistoryService, MAX_CSV_BYTES
+from profile_service import LearnerProfileService
+from resume_parser import resume_parser
+
+
+MAX_RESUME_BYTES = 5_000_000
+ALLOWED_RESUME_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
+
+class ResumeParserProtocol(Protocol):
+    async def parse_resume(self, content: bytes, content_type: str) -> dict: ...
+
+
+def get_resume_parser() -> ResumeParserProtocol:
+    return resume_parser
 
 
 router = APIRouter(prefix="/v1/me", tags=["learning history"])
@@ -71,3 +89,34 @@ async def import_learning_history_csv(
 ) -> CsvImportResponse:
     return LearningHistoryService(db).import_csv(identity, await _read_csv(file), allow_partial)
 
+
+@router.post("/resume/parse", response_model=ResumeEvidenceResponse)
+async def parse_resume_evidence(
+    file: Annotated[UploadFile, File(...)],
+    identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    parser: Annotated[ResumeParserProtocol, Depends(get_resume_parser)],
+    resume_file_id: Annotated[str | None, Form()] = None,
+) -> ResumeEvidenceResponse:
+    if file.content_type not in ALLOWED_RESUME_TYPES:
+        raise APIError(415, "UPLOAD_TYPE_INVALID", "Upload a PDF or DOCX resume")
+    content = await file.read(MAX_RESUME_BYTES + 1)
+    if len(content) > MAX_RESUME_BYTES:
+        raise APIError(413, "UPLOAD_TOO_LARGE", "Resume files must be 5 MB or smaller")
+
+    parsed = await parser.parse_resume(content, file.content_type or "")
+    skills = [str(skill).strip() for skill in parsed.get("skills", []) if str(skill).strip()][:100]
+    profile_service = LearnerProfileService(db)
+    profile = profile_service.ensure_profile(identity)
+    profile.resume_filename = (file.filename or "resume")[:255]
+    profile.resume_file_id = resume_file_id
+    added = profile_service.add_resume_evidence(identity.user_id, skills)
+    db.commit()
+    return ResumeEvidenceResponse(
+        filename=profile.resume_filename,
+        skills_found=skills,
+        skills_added=added,
+        evidence_count=len(skills),
+        education_count=len(parsed.get("education", [])),
+        experience_count=len(parsed.get("experience", [])),
+    )

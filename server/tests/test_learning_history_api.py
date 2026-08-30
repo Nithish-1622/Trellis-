@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from auth import AuthenticatedUser, get_current_user
-from database import Base, LearningHistory, get_db
+from database import Base, LearnerSkill, LearningHistory, SkillEvidence, get_db
 from main import app
 
 
@@ -114,3 +114,37 @@ def test_csv_partial_import_persists_only_valid_unique_rows(history_client):
     assert response.json()["rejected_count"] == 1
     assert db.query(LearningHistory).count() == 1
 
+
+def test_resume_skills_add_evidence_without_downgrading_existing_skill(history_client):
+    client, db, _identity = history_client
+    onboarding = {
+        "current_step": "review",
+        "completed_steps": ["goal", "current_position", "previous_learning", "preferences"],
+        "complete": True,
+        "draft": {
+            "goal": {"free_text": "Become a backend engineer this year", "target_role": "Backend Engineer", "objective": "Build reliable APIs"},
+            "current_position": {"interests": [], "skills": [{"name": "Python", "proficiency": "intermediate", "evidence_source": "self_reported"}]},
+            "previous_learning": {"courses": []},
+            "preferences": {"preferred_formats": [], "weekly_hours": 8, "accessibility_needs": []},
+        },
+    }
+    assert client.post("/v1/me/onboarding", json=onboarding).status_code == 200
+
+    class StubResumeParser:
+        async def parse_resume(self, _content: bytes, _content_type: str):
+            return {"skills": ["Python", "Docker"], "education": [], "experience": []}
+
+    from learning_history_api import get_resume_parser
+
+    app.dependency_overrides[get_resume_parser] = lambda: StubResumeParser()
+    response = client.post(
+        "/v1/me/resume/parse",
+        files={"file": ("resume.pdf", BytesIO(b"%PDF-test"), "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    python_skill = db.query(LearnerSkill).filter(LearnerSkill.display_name == "Python").one()
+    assert python_skill.proficiency == "intermediate"
+    assert python_skill.source == "self_reported"
+    assert db.query(LearnerSkill).filter(LearnerSkill.display_name == "Docker").count() == 1
+    assert db.query(SkillEvidence).count() == 2
