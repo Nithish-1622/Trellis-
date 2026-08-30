@@ -21,7 +21,7 @@ const Chat: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([
         {
             id: '1',
-            text: 'Hello! I\'m Educat-AI, your personal career mentor. I can help you find jobs, plan your roadmap, or answer career questions. How can I help you today?',
+            text: 'Hello! I\'m Trellis, your personal career mentor. I can help you find jobs, plan your roadmap, or answer career questions. How can I help you today?',
             sender: 'ai',
             timestamp: new Date()
         }
@@ -116,7 +116,7 @@ const Chat: React.FC = () => {
                             </div>
                             <div>
                                 <h1 className={`text-base font-bold leading-none ${darkMode ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                                    Educat<span className="text-indigo-500">AI</span> Assistant
+                                    Trellis Assistant
                                 </h1>
                                 <div className="flex items-center gap-1.5 mt-1">
                                     <span className="relative flex h-2 w-2">
