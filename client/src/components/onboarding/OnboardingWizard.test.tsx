@@ -42,6 +42,12 @@ const renderWizard = () =>
     </MemoryRouter>,
   )
 
+const renderEditWizard = () => render(
+  <MemoryRouter initialEntries={['/onboarding?edit=1']}>
+    <Routes><Route path="/onboarding" element={<OnboardingWizard />} /><Route path="/profile" element={<h1>Profile home</h1>} /></Routes>
+  </MemoryRouter>,
+)
+
 describe('OnboardingWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -130,6 +136,14 @@ describe('OnboardingWizard', () => {
     renderWizard()
 
     expect(await screen.findByRole('heading', { name: 'Profile home' })).toBeVisible()
+  })
+
+  it('lets returning learners explicitly edit a completed profile', async () => {
+    getOnboarding.mockResolvedValue({ ...emptySession, status: 'completed', draft: { ...emptySession.draft, goal: { free_text: 'Become a backend engineer this year', target_role: 'Backend Engineer', objective: 'Build APIs', target_date: null } } })
+
+    renderEditWizard()
+
+    expect(await screen.findByLabelText('Target role')).toHaveValue('Backend Engineer')
   })
 
   it('shows a recoverable save error without discarding answers', async () => {

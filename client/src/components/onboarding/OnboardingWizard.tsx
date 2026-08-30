@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getOnboarding, saveOnboarding } from '../../services/onboardingService'
 import type { OnboardingDraft, OnboardingStep } from '../../services/onboardingService'
 import { trackOnboardingEvent } from '../../services/analytics'
@@ -28,6 +28,8 @@ const mergeDraft = (draft: OnboardingDraft): OnboardingDraft => ({
 
 export default function OnboardingWizard() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isEditing = searchParams.get('edit') === '1'
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('goal')
   const [completedSteps, setCompletedSteps] = useState<OnboardingStep[]>([])
   const [draft, setDraft] = useState<OnboardingDraft>(emptyDraft)
@@ -45,12 +47,12 @@ export default function OnboardingWizard() {
     setError(null)
     try {
       const session = await getOnboarding()
-      if (session.status === 'completed') {
+      if (session.status === 'completed' && !isEditing) {
         completedRef.current = true
         navigate('/profile', { replace: true })
         return
       }
-      setCurrentStep(session.current_step)
+      setCurrentStep(isEditing ? 'goal' : session.current_step)
       setCompletedSteps(session.completed_steps)
       setDraft(mergeDraft(session.draft))
       trackOnboardingEvent('onboarding_step_viewed', session.current_step)
@@ -65,7 +67,7 @@ export default function OnboardingWizard() {
     void loadOnboarding()
     // The initial server resume should run once for this mounted wizard.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate])
+  }, [navigate, isEditing])
 
   useEffect(() => {
     if (!isLoading) mainRef.current?.querySelector<HTMLElement>('#onboarding-step-title')?.focus()
