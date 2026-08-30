@@ -84,6 +84,13 @@ export interface LearnerProfile {
   is_onboarding_complete: boolean
 }
 
+export interface GoalAnalysis {
+  target_role: string
+  objective: string
+  target_date: string | null
+  explanation: string
+}
+
 export const getOnboarding = () => apiRequest<OnboardingSession>('/v1/me/onboarding')
 
 export const saveOnboarding = (update: OnboardingUpdate) =>
@@ -93,3 +100,9 @@ export const saveOnboarding = (update: OnboardingUpdate) =>
   })
 
 export const getLearnerProfile = () => apiRequest<LearnerProfile>('/v1/me/profile')
+
+export const analyzeGoal = (goal: string) =>
+  apiRequest<GoalAnalysis>('/v1/me/onboarding/goal-analysis', {
+    method: 'POST',
+    body: JSON.stringify({ goal }),
+  })
