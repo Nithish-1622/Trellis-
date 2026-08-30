@@ -1,12 +1,16 @@
 """Stable API error contracts and FastAPI exception handlers."""
 
 from typing import Any
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+logger = logging.getLogger(__name__)
 
 
 class APIError(Exception):
@@ -84,4 +88,12 @@ def register_error_handlers(app: FastAPI) -> None:
                     exc.errors(),
                 )
             ),
+        )
+
+    @app.exception_handler(Exception)
+    async def unexpected_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled API error: %s", type(exc).__name__)
+        return JSONResponse(
+            status_code=500,
+            content=_error_content("INTERNAL_ERROR", "An unexpected server error occurred"),
         )

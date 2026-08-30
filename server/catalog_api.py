@@ -3,7 +3,9 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
+import asyncio
 import ipaddress
+import socket
 from typing import Protocol
 from urllib.parse import urlsplit
 
@@ -47,7 +49,12 @@ class PublicLinkChecker:
             if not address.is_global:
                 return "blocked"
         except ValueError:
-            pass
+            try:
+                addresses = await asyncio.to_thread(socket.getaddrinfo, parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+            except socket.gaierror:
+                return "unreachable"
+            if not addresses or any(not ipaddress.ip_address(item[4][0]).is_global for item in addresses):
+                return "blocked"
         try:
             async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
                 response = await client.head(url)

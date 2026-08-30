@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./career_mentor.db"
     
     # Google Gemini (Legacy / Embeddings)
-    GOOGLE_API_KEY: str
+    GOOGLE_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-pro"
     GEMINI_EMBEDDING_MODEL: str = "models/text-embedding-004"
     
