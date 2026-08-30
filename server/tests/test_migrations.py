@@ -20,6 +20,14 @@ def test_alembic_baseline_upgrades_and_downgrades_clean_database(tmp_path):
         "applications",
         "roadmaps",
         "milestones",
+        "app_users",
+        "user_roles",
+        "onboarding_sessions",
+        "skills",
+        "skill_aliases",
+        "learner_skills",
+        "learning_history",
+        "skill_evidence",
         "alembic_version",
     }.issubset(inspect(engine).get_table_names())
 
