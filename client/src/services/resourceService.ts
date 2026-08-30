@@ -21,8 +21,26 @@ export const discoverResources = () => apiRequest<DiscoveryJob>('/v1/resources/d
   body: '{}',
 })
 
-export const getDiscoveryJob = (jobId: string) =>
-  apiRequest<DiscoveryJob>(`/v1/resources/discovery-jobs/${jobId}`)
+export const getDiscoveryJob = (jobId: string, signal?: AbortSignal) =>
+  apiRequest<DiscoveryJob>(`/v1/resources/discovery-jobs/${jobId}`, { signal })
+
+const getDiscoveryJobBefore = async (jobId: string, deadline: number) => {
+  const remainingMs = deadline - Date.now()
+  if (remainingMs <= 0) throw new DOMException('Discovery polling timed out', 'TimeoutError')
+  const controller = new AbortController()
+  let timeout: ReturnType<typeof globalThis.setTimeout>
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = globalThis.setTimeout(() => {
+      controller.abort()
+      reject(new DOMException('Discovery polling timed out', 'TimeoutError'))
+    }, remainingMs)
+  })
+  try {
+    return await Promise.race([getDiscoveryJob(jobId, controller.signal), timeoutPromise])
+  } finally {
+    globalThis.clearTimeout(timeout!)
+  }
+}
 
 export const waitForDiscovery = async (
   jobId: string,
@@ -31,14 +49,21 @@ export const waitForDiscovery = async (
   pollMs = 1_500,
 ) => {
   const deadline = Date.now() + timeoutMs
-  let job = await getDiscoveryJob(jobId)
-  onProgress?.(job)
-  while (!['completed', 'dead'].includes(job.status) && Date.now() < deadline) {
-    await new Promise((resolve) => window.setTimeout(resolve, pollMs))
-    job = await getDiscoveryJob(jobId)
+  let job: DiscoveryJob | undefined
+  while (Date.now() < deadline) {
+    try {
+      job = await getDiscoveryJobBefore(jobId, deadline)
+    } catch (error) {
+      if (job && error instanceof DOMException && error.name === 'TimeoutError') return job
+      throw error
+    }
     onProgress?.(job)
+    if (['completed', 'dead'].includes(job.status)) return job
+    const delay = Math.min(pollMs, Math.max(deadline - Date.now(), 0))
+    await new Promise((resolve) => globalThis.setTimeout(resolve, delay))
   }
-  return job
+  if (job) return job
+  throw new DOMException('Discovery polling timed out', 'TimeoutError')
 }
 
 export const recordResourceInteraction = (
