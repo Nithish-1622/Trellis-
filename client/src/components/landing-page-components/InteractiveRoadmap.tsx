@@ -45,7 +45,7 @@ const InteractiveRoadmap: React.FC<InteractiveRoadmapProps> = ({ darkMode }) => 
                 <ScrollReveal animation="fade-in-up">
                     <div className='text-center mb-16'>
                         <h2 className={`text-3xl lg:text-4xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-zinc-900'}`}>
-                            How <span className="text-indigo-500">EducatAI</span> Works
+                            How <span className="text-indigo-500">Trellis</span> Works
                         </h2>
                         <p className={`max-w-2xl mx-auto text-lg ${darkMode ? 'text-zinc-400' : 'text-zinc-600'}`}>
                             A continuous loop of improvements for your career.

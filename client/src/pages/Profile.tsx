@@ -131,7 +131,7 @@ const Profile: React.FC = () => {
 
                 {/* Chat Button */}
                 <Link to="/chat" className={`group relative flex items-center gap-3 pl-5 pr-5 py-1.5 rounded-full border shadow-2xl backdrop-blur-xl transition-all duration-300 hover:scale-105 ${darkMode ? 'bg-zinc-900/80 border-zinc-700 text-white hover:bg-zinc-800' : 'bg-white/80 border-zinc-200 text-zinc-900 hover:bg-zinc-50'}`}>
-                    <span className="text-sm font-bold tracking-wide">Educat-AI</span>
+                    <span className="text-sm font-bold tracking-wide">Trellis</span>
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg ring-2 ring-white/20 group-hover:shadow-indigo-500/50 transition-shadow">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                     </div>

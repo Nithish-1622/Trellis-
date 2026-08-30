@@ -12,7 +12,7 @@ const testimonials = [
         role: "Software Engineer",
         company: "Tech Corp",
         image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150&h=150",
-        quote: "Educat-AI transformed my career path. The personalized course recommendations were spot on and helped me land my dream job."
+        quote: "Trellis transformed my career path. The personalized course recommendations were spot on and helped me land my dream job."
     },
     {
         id: 2,
@@ -28,7 +28,7 @@ const testimonials = [
         role: "Product Manager",
         company: "Innovate Inc",
         image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150&h=150",
-        quote: "I was overwhelmed by the amount of resources out there. Educat-AI curates exactly what I need to learn next, saving me so much time."
+        quote: "I was overwhelmed by the amount of resources out there. Trellis curates exactly what I need to learn next, saving me so much time."
     }
 ];
 
@@ -42,7 +42,7 @@ const Testimonials: React.FC<TestimonialsProps> = ({ darkMode }) => {
                             Success Stories
                         </h2>
                         <p className={`text-lg md:text-xl max-w-2xl mx-auto ${darkMode ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                            Join thousands of learners who have accelerated their careers with Educat-AI.
+                            Join thousands of learners who have accelerated their careers with Trellis.
                         </p>
                     </div>
                 </ScrollReveal>

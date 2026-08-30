@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import ThemeToggle from '../landing-page-components/ThemeToggle';
-import ecaiLogo from '../../assets/ecai.png';
+import trellisLogo from '../../assets/trellis.png';
 
 interface ProfileNavbarProps {
     darkMode: boolean;
@@ -55,9 +55,9 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
         <nav className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b transition-colors duration-300 ${darkMode ? 'bg-zinc-950/80 border-white/10' : 'bg-white/80 border-zinc-200'}`}>
             <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                 <div className="flex items-center gap-3 cursor-pointer">
-                    <img src={ecaiLogo} alt="Educat-AI" className="h-8 w-auto" />
+                    <img src={trellisLogo} alt="Trellis" className="h-8 w-auto" />
                     <span className={`font-bold text-xl tracking-tight hidden sm:block ${darkMode ? 'text-white' : 'text-zinc-900'}`}>
-                        Educat<span className="text-indigo-500">AI</span>
+                        Trellis
                     </span>
                 </div>
                 <div className="flex items-center gap-6">

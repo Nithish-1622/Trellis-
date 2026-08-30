@@ -41,7 +41,7 @@ const AuthVisual: React.FC = () => {
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className={`text-xs font-mono font-bold tracking-widest uppercase ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>Educat Access</div>
+                            <div className={`text-xs font-mono font-bold tracking-widest uppercase ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>Trellis Access</div>
                             <div className={`text-[10px] font-mono opacity-50 ${darkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>VERIFIED v3.0</div>
                         </div>
                     </div>

@@ -1,4 +1,4 @@
-# EducatAI - AI-Powered Career Mentorship Platform
+# Trellis - AI-Powered Career Mentorship Platform
 
 > An intelligent career mentorship platform that leverages AI agents to provide personalized guidance, job recommendations, and learning resources for career development.
 
@@ -6,17 +6,17 @@
 [![React](https://img.shields.io/badge/React-19.2-blue.svg)](https://react.dev/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Latest-purple.svg)](https://langchain-ai.github.io/langgraph/)
 [![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)](https://www.python.org/)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-orange.svg)](https://educat.appwrite.network)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-orange.svg)](https://trellis.appwrite.network)
 
 ## 🌐 Live Demo
 
-Check out the live application here: **[EducatAI](https://educat.appwrite.network)**
+Check out the live application here: **[Trellis](https://trellis.appwrite.network)**
 
-Backend API docs: **[API Docs](https://educat-api.saumyajit.dev/redoc)**
+Backend API docs: **[API Docs](https://trellis-api.saumyajit.dev/redoc)**
 
 ## 🎯 Overview
 
-EducatAI is a full-stack career mentorship platform that combines the power of AI agents, large language models, and real-time data to provide personalized career guidance. The platform helps users:
+Trellis is a full-stack career mentorship platform that combines the power of AI agents, large language models, and real-time data to provide personalized career guidance. The platform helps users:
 
 - 📄 **Parse and analyze resumes** to extract skills, experience, and qualifications
 - 💼 **Discover real job opportunities** from LinkedIn, Indeed, Glassdoor, and other platforms
@@ -27,7 +27,7 @@ EducatAI is a full-stack career mentorship platform that combines the power of A
 
 ## 🏗️ Architecture
 
-![System Architecture](./images/educat_architecture.png)
+![System Architecture](./images/trellis_architecture.png)
 
 ### Tech Stack
 
@@ -110,8 +110,8 @@ EducatAI is a full-stack career mentorship platform that combines the power of A
 1.  **Clone the repository**
 
     ```bash
-    git clone https://github.com/agspades/educat-anokha.git
-    cd educat-anokha/server
+    git clone https://github.com/agspades/trellis.git
+    cd trellis/server
     ```
 
 2.  **Configure Environment**
@@ -267,7 +267,7 @@ curl -X POST http://localhost:8000/agent/jobs/recommend \
 ## 📁 Project Structure
 
 ```
-educat-anokha/
+trellis/
 ├── client/                    # React frontend
 │   ├── src/
 │   │   ├── pages/            # Page components
@@ -346,7 +346,7 @@ JSEARCH_API_KEY = "..."
 JSEARCH_API_HOST = "jsearch.p.rapidapi.com"
 
 # Application
-APP_NAME = "EducatAI Career Mentor"
+APP_NAME = "Trellis Career Mentor"
 LOG_LEVEL = "INFO"
 ```
 
@@ -366,8 +366,8 @@ LOG_LEVEL = "INFO"
 ### Database Connection Error
 
 - **Check**: PostgreSQL is running (`sudo systemctl status postgresql`)
-- **Check**: Database exists (`psql -l | grep educat_db`)
-- **Check**: pgvector extension installed (`psql educat_db -c "\dx"`)
+- **Check**: Database exists (`psql -l | grep trellis_db`)
+- **Check**: pgvector extension installed (`psql trellis_db -c "\dx"`)
 
 ### Import Errors
 
@@ -421,7 +421,7 @@ For questions or issues:
 
 - Open an issue on GitHub
 - Check the [documentation](server/docs/)
-- Review API docs here: [API Docs](https://educat-api.saumyajit.dev/redoc)
+- Review API docs here: [API Docs](https://trellis-api.saumyajit.dev/redoc)
 
 ---
 

@@ -71,7 +71,7 @@ const Profile3DCard: React.FC<Profile3DCardProps> = ({ name, photo, role = "Comp
                             </div>
 
                             {/* Brand Logo/Name */}
-                            <div className={`font-bold italic opacity-80 ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>EducatAI</div>
+                            <div className={`font-bold italic opacity-80 ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>Trellis</div>
                         </div>
 
                         {/* Main Identity Section */}
