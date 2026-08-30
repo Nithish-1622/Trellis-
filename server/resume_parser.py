@@ -5,9 +5,9 @@ import re
 from datetime import datetime
 
 try:
-    import PyPDF2
+    import pypdf
 except ImportError:
-    PyPDF2 = None
+    pypdf = None
 
 try:
     from docx import Document
@@ -30,12 +30,12 @@ class ResumeParser:
     
     def extract_text_from_pdf(self, file_content: bytes) -> str:
         """Extract text from PDF file."""
-        if not PyPDF2:
-            raise ImportError("PyPDF2 not installed. Run: pip install PyPDF2")
+        if not pypdf:
+            raise ImportError("pypdf is not installed")
         
         try:
             pdf_file = io.BytesIO(file_content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            pdf_reader = pypdf.PdfReader(pdf_file)
             
             text = ""
             for page in pdf_reader.pages:

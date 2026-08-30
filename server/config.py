@@ -1,5 +1,5 @@
 """Configuration management for the Career Mentor API."""
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 
@@ -7,10 +7,13 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Application
-    APP_NAME: str = "Agentic Career Mentor API"
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+
+    APP_NAME: str = "Trellis Personalized Learning API"
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    PILOT_FEATURE_ENABLED: bool = True
     
     # API
     API_HOST: str = "0.0.0.0"
@@ -74,9 +77,4 @@ class Settings(BaseSettings):
         """Parse the configured bootstrap administrator identifiers."""
         return {user_id.strip() for user_id in self.ADMIN_USER_IDS.split(",") if user_id.strip()}
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-
-
 settings = Settings()

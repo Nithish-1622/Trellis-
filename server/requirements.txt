@@ -62,7 +62,7 @@ numpy
 pandas
 
 # Document Parsing
-PyPDF2
+pypdf
 python-docx
 beautifulsoup4
 lxml
@@ -80,4 +80,3 @@ google-genai
 huggingface_hub
 tokenizers
 protobuf
-

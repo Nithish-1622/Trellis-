@@ -4,9 +4,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
 from typing import Annotated
+import time
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,8 @@ from learning_history_api import router as learning_history_router
 from migration_runner import run_migrations
 from profile_api import router as profile_router
 from roadmap_api import router as roadmap_router
+from operations_api import router as operations_router
+from telemetry import metrics
 
 
 logging.basicConfig(
@@ -63,6 +67,7 @@ for router in (
     dashboard_router,
     chat_router,
     career_router,
+    operations_router,
 ):
     app.include_router(router)
 
@@ -73,6 +78,22 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def pilot_and_observability(request, call_next):
+    if request.url.path.startswith("/v1/") and not settings.PILOT_FEATURE_ENABLED:
+        return JSONResponse(status_code=404, content={"error": {"code": "PILOT_DISABLED", "message": "The Trellis pilot is not enabled"}})
+    started = time.perf_counter()
+    response = await call_next(request)
+    route = request.scope.get("route")
+    template = getattr(route, "path", request.url.path)
+    key = f"http.{request.method}.{template}"
+    metrics.observe(key, (time.perf_counter() - started) * 1000, response.status_code >= 500)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @app.get("/")

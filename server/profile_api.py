@@ -16,6 +16,7 @@ from profile_schemas import (
 )
 from profile_service import LearnerProfileService
 from goal_analyzer import GoalAnalyzer, get_goal_analyzer
+from rate_limit import SlidingWindowRateLimiter, get_expensive_operation_limiter
 
 
 router = APIRouter(prefix="/v1/me", tags=["learner profile"])
@@ -26,7 +27,9 @@ async def analyze_onboarding_goal(
     request: GoalAnalysisRequest,
     _identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
     analyzer: Annotated[GoalAnalyzer, Depends(get_goal_analyzer)],
+    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
 ) -> GoalAnalysisResponse:
+    limiter.check(_identity.user_id, "goal_analysis")
     return await analyzer.analyze(request.goal)
 
 

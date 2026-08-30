@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime
 import json
 import logging
+import time
 from typing import Protocol
 import uuid
 
@@ -15,6 +16,7 @@ from chat_schemas import AssistantAction, AssistantDraft, ChatMessageResponse
 from config import settings
 from database import AssessmentAttempt, Memory, Roadmap, RoadmapMilestone, RoadmapVersion, UserProfile
 from profile_service import LearnerProfileService
+from telemetry import metrics
 
 
 logger = logging.getLogger(__name__)
@@ -55,8 +57,12 @@ class LearningAssistant:
             f"Context: {json.dumps(context, default=str)[:12000]}\nRecent conversation: {json.dumps(history)[:6000]}\nLearner: {message}"
         )
         try:
-            return await asyncio.wait_for(self.model.ainvoke(prompt), timeout=14)
+            started = time.perf_counter()
+            result = await asyncio.wait_for(self.model.ainvoke(prompt), timeout=14)
+            metrics.observe("llm.chat", (time.perf_counter() - started) * 1000)
+            return result
         except Exception as exc:
+            metrics.observe("llm.chat", (time.perf_counter() - started) * 1000, failed=True)
             logger.warning("Learning assistant provider failed: %s", type(exc).__name__)
             return fallback
 

@@ -3,12 +3,14 @@
 import asyncio
 import logging
 import re
+import time
 from typing import Protocol
 
 from langchain_groq import ChatGroq
 
 from config import settings
 from profile_schemas import GoalAnalysisResponse
+from telemetry import metrics
 
 
 logger = logging.getLogger(__name__)
@@ -45,8 +47,12 @@ class GoalAnalyzer:
                 + goal
             )
             try:
-                return await asyncio.wait_for(self.model.ainvoke(prompt), timeout=10.0)
+                started = time.perf_counter()
+                result = await asyncio.wait_for(self.model.ainvoke(prompt), timeout=10.0)
+                metrics.observe("llm.goal_analysis", (time.perf_counter() - started) * 1000)
+                return result
             except Exception as exc:
+                metrics.observe("llm.goal_analysis", (time.perf_counter() - started) * 1000, failed=True)
                 logger.warning("Goal analysis provider failed: %s", type(exc).__name__)
 
         return self._fallback(goal)

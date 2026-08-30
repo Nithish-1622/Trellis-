@@ -12,6 +12,7 @@ import httpx
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, ValidationError
 
 from config import settings
+from telemetry import metrics
 
 
 logger = logging.getLogger(__name__)
@@ -169,12 +170,17 @@ class HybridResourceProvider:
 
     @staticmethod
     async def _safe_search(provider: ResourceProvider, query: str, limit: int) -> list[ExternalResource]:
+        provider_name = provider.__class__.__name__.removesuffix("Provider").casefold()
+        started = time.perf_counter()
         for attempt in range(2):
             try:
-                return await provider.search(query, limit)
+                results = await provider.search(query, limit)
+                metrics.observe(f"provider.{provider_name}", (time.perf_counter() - started) * 1000)
+                return results
             except (httpx.HTTPError, ValidationError, ValueError) as exc:
                 if attempt == 1:
                     logger.warning("Resource provider failed: %s", type(exc).__name__)
+                    metrics.observe(f"provider.{provider_name}", (time.perf_counter() - started) * 1000, failed=True)
         return []
 
 

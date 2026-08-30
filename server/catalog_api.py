@@ -26,6 +26,7 @@ from catalog_service import CatalogService
 from database import get_db
 from profile_service import LearnerProfileService
 from resource_providers import ExternalResource, HybridResourceProvider, get_hybrid_resource_provider
+from rate_limit import SlidingWindowRateLimiter, get_expensive_operation_limiter
 
 
 learner_router = APIRouter(prefix="/v1/resources", tags=["learning resources"])
@@ -64,6 +65,7 @@ async def get_recommendations(
     identity: Annotated[AuthenticatedUser, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
     provider: Annotated[HybridResourceProvider, Depends(get_hybrid_resource_provider)],
+    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     offset: Annotated[int, Query(ge=0)] = 0,
     resource_type: ResourceType | None = None,
@@ -73,6 +75,7 @@ async def get_recommendations(
     catalog_page = service.recommendations(identity, limit, offset, resource_type)
     if not include_live or offset > 0:
         return catalog_page
+    limiter.check(identity.user_id, "live_resources")
     profile = LearnerProfileService(db).ensure_profile(identity)
     query = " ".join(part for part in [profile.target_role, profile.objective] if part) or "practical learning project"
     external = await provider.search(query, min(limit, 10))
@@ -86,8 +89,10 @@ async def preview_provider_resources(
     query: Annotated[str, Query(min_length=2, max_length=200)],
     _admin: Annotated[AuthenticatedUser, Depends(require_admin)],
     provider: Annotated[HybridResourceProvider, Depends(get_hybrid_resource_provider)],
+    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
     limit: Annotated[int, Query(ge=1, le=25)] = 10,
 ) -> list[ExternalResource]:
+    limiter.check(_admin.user_id, "provider_preview")
     return await provider.search(query, limit)
 
 
@@ -125,7 +130,9 @@ async def sync_provider_resources(
     admin: Annotated[AuthenticatedUser, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
     provider: Annotated[HybridResourceProvider, Depends(get_hybrid_resource_provider)],
+    limiter: Annotated[SlidingWindowRateLimiter, Depends(get_expensive_operation_limiter)],
 ) -> ImportResult:
+    limiter.check(admin.user_id, "provider_sync")
     return CatalogService(db).sync_external(admin, await provider.search(payload.query, payload.limit))
 
 
