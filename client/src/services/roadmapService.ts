@@ -8,6 +8,10 @@ export interface RoadmapResource {
   url: string
   explanation: string
   provenance: string
+  status?: 'verified' | 'vetted'
+  score?: number
+  confidence?: number
+  score_version?: string | null
 }
 
 export interface RoadmapMilestone {
