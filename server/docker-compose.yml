@@ -29,7 +29,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U myuser" ]
+      test: ["CMD-SHELL", "pg_isready -U myuser -d career_mentor_db"]
       interval: 10s
       timeout: 5s
       retries: 5
