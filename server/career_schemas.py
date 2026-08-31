@@ -1,9 +1,9 @@
 """Typed contracts for career recommendations and evidence."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import AnyHttpUrl, BaseModel, Field
+from pydantic import AnyHttpUrl, BaseModel, Field, StringConstraints
 
 
 class SalaryRange(BaseModel):
@@ -63,7 +63,7 @@ class InterviewStart(BaseModel):
 
 
 class InterviewAnswer(BaseModel):
-    answer: str = Field(min_length=20, max_length=10_000)
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10_000)]
 
 
 class InterviewInteraction(BaseModel):
