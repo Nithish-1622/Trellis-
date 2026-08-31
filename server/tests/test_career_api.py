@@ -90,6 +90,25 @@ def test_interview_is_persistent_and_creates_lower_weight_evidence(career_client
     assert evidence.weight < 0.7
 
 
+def test_interview_accepts_a_concise_non_empty_answer(career_client):
+    client, _db = career_client
+    started = client.post("/v1/career/interviews", json={"target_role": "Backend Engineer", "focus_area": "Caching"})
+
+    response = client.post(
+        f'/v1/career/interviews/{started.json()["session_id"]}/answers',
+        json={"answer": "Use Redis."},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["previous_score"] is not None
+
+    blank = client.post(
+        f'/v1/career/interviews/{started.json()["session_id"]}/answers',
+        json={"answer": "   "},
+    )
+    assert blank.status_code == 422
+
+
 def test_interview_and_application_feedback_are_owner_scoped(career_client):
     client, db = career_client
     started = client.post("/v1/career/interviews", json={"target_role": "Backend Engineer", "focus_area": "Python"})

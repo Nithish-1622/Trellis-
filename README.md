@@ -75,27 +75,27 @@ Trellis operates on a decoupled microservices architecture with a React (TypeScr
 ---
 
 ### 🔍 2. Layered Resource Vetting & Anti-Hallucination Indexing
-- **Zero URL Invention Guarantee**: Traditional LLM wrappers frequently hallucinate dead or non-existent course URLs. Trellis completely solves this: the LLM roadmap engine **never generates URLs**. It operates strictly over indexed, canonical database resource identifiers (`youtube:<id>`, `github:<owner>/<repo>`, `catalog:<id>`) that have passed strict validation.
+- **Zero URL Invention Guarantee**: The deterministic roadmap engine **never generates URLs**. It operates strictly over indexed, canonical database resource identifiers (`youtube:<id>`, `github:<owner>/<repo>`, `catalog:<id>`) that have passed strict validation.
 - **Layered Sourcing Engine**:
   - *Level 1 (Highest Trust)*: Internal human-curated catalog of verified courses and books.
   - *Level 2 (Automated Discovery)*: Real-time API discovery via YouTube Data API v3 and GitHub REST API when coverage gaps are detected.
-- **Trellis Resource Score v1 Algorithm**:
+- **Trellis Resource Score v3 Algorithm**:
   Every discovered candidate is analyzed and scored out of 100 based on a transparent 5-factor mathematical model:
   $$\text{Score} = 0.40(R_{\text{sem}}) + 0.20(Q_{\text{struct}}) + 0.15(E_{\text{log}}) + 0.15(C_{\text{auth}}) + 0.10(F_{\text{decay}})$$
-  - **Semantic Relevance ($40\%$)**: Vector embedding similarity between target skill requirements and resource content/transcripts.
-  - **Content Quality ($20\%$)**: Structural rigor, transcript clarity, code repository layout, and presence of comprehensive READMEs.
+  - **Deterministic Relevance ($40\%$)**: Skill-term coverage in validated provider titles and descriptions.
+  - **Content Quality ($20\%$)**: Description completeness, useful duration, practical-learning signals, and repository documentation.
   - **Engagement Quality ($15\%$)**: Log-scaled view-to-like ratios, star growth, and subscriber engagement bounds.
   - **Creator / Repository Credibility ($15\%$)**: Domain authority, historical creator output consistency, and repository activity.
   - **Freshness Half-Life Degradation ($10\%$)**: Topic-aware temporal decay math:
     - *Fast-Moving Topics (e.g. LLMs, Frontend Frameworks)*: 1-year half-life.
     - *Moderate Topics (e.g. Cloud Architecture, DevOps)*: 3-year half-life.
     - *Stable Topics (e.g. Data Structures, Linear Algebra)*: 8-year half-life.
-- **Strict Quality Admission Gate**: Resources must achieve a minimum composite score of **`80/100`** and confidence **`≥ 0.45`** to earn the `vetted` badge and become eligible for roadmap inclusion.
+- **Strict Quality Admission Gate**: Metadata-vetted YouTube videos must score **`70/100`** and all other automatically vetted resources **`80/100`**, with confidence **`≥ 0.45`**. A mandatory relevance check rejects off-topic results before either score threshold is considered.
 
 ---
 
 ### ⚡ 3. Durable PostgreSQL Job Queue (Zero-Redis Overhead)
-- **High-Throughput Asynchronous Worker**: Background resource discovery, transcript extraction, and AI scoring run in a dedicated worker process sharing the FastAPI runtime image.
+- **High-Throughput Asynchronous Worker**: Background resource discovery and deterministic metadata scoring run in a dedicated worker process sharing the FastAPI runtime image.
 - **PostgreSQL `FOR UPDATE SKIP LOCKED`**: Employs native database row locking to coordinate job allocation across worker instances without requiring a separate Redis or Celery deployment.
 - **Idempotent Coverage Triggers**: Coverage gap discovery requests are deduplicated by learner profile version and skill requirement hash, eliminating redundant external API consumption and LLM costs.
 
@@ -143,7 +143,7 @@ Trellis operates on a decoupled microservices architecture with a React (TypeScr
 | **Framework** | FastAPI (Python 3.11+) | Asynchronous RESTful API services & schema validation |
 | **Database** | PostgreSQL 17 + `pgvector` | Relational storage & high-performance vector search |
 | **ORM / Migrations**| SQLAlchemy 2.0 & Alembic | Schema definition and ordered migration execution |
-| **AI Processing** | Groq API (Llama 3 / Mixtral) | High-speed LLM goal parsing, transcript analysis & chat |
+| **AI Processing** | Groq API (Llama 3 / Mixtral) | Optional goal parsing, chat, and interview features; resource recommendations do not use it |
 | **External APIs** | YouTube Data API, GitHub REST API, JSearch | Resource discovery & live job data fetching |
 | **Worker Queue** | PostgreSQL `SKIP LOCKED` worker | Asynchronous background vetting & re-evaluation |
 | **Auth & Files** | Appwrite Admin SDK | Server-side JWT verification & resume PDF storage |
@@ -199,8 +199,8 @@ Trellis/
     ├── goal_skill_planner.py   # Skill graph dependency resolution
     ├── roadmap_engine.py       # Prerequisite-aware roadmap construction & scheduling
     ├── profile_service.py      # Profile management, PDF resume parser, skill evidence
-    ├── catalog_service.py      # Resource scoring (v1 engine), indexing & search
-    ├── resource_providers.py   # YouTube, GitHub, and transcript fetching adapters
+    ├── catalog_service.py      # Resource indexing, moderation, and search
+    ├── resource_providers.py   # YouTube and GitHub discovery adapters
     ├── resource_worker.py      # Durable PostgreSQL task worker process
     ├── assessment_service.py   # Deterministic quiz generator & project rubric reviewer
     ├── adaptation_service.py   # Roadmap progress analysis & proposal diff generator
@@ -394,7 +394,7 @@ make e2e
 ## 📜 Compliance, Accessibility & Standards
 
 - **Accessibility**: Built to meet **WCAG 2.1 AA** standards across keyboard focus traps, ARIA labels, contrast ratios, and screen-reader reflow.
-- **Privacy & Safety**: Learner prompts, resume texts, and raw transcript analyses are processed in-memory and never logged or exposed to third-party tracking.
+- **Privacy & Safety**: Learner prompts and resume text are processed in-memory and never logged or exposed to third-party tracking; resource scoring uses provider metadata only.
 - **Learner Agency**: System recommendations provide evidence provenance. No roadmap modification is applied without learner confirmation.
 
 For further architectural specifications, refer to [server/docs/ARCHITECTURE.md](server/docs/ARCHITECTURE.md).  

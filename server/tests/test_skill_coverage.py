@@ -60,7 +60,7 @@ def test_coverage_requires_two_eligible_resources_and_a_practical_resource_when_
     db.flush()
     db.add(goal)
     resources = [
-        LearningResource(id="verified-video", provider="catalog", external_id="v1", canonical_key="catalog:v1", resource_type="video", title="Spring", url="https://example.test/v1", verification_status="verified", link_status="healthy", language="English", topics=[]),
+        LearningResource(id="verified-video", provider="youtube", external_id="v1", canonical_key="youtube:v1", resource_type="video", title="Spring", url="https://youtube.com/watch?v=v1", verification_status="vetted", resource_score=72, score_confidence=.8, link_status="healthy", language="English", topics=[]),
         LearningResource(id="vetted-project", provider="github", external_id="p1", canonical_key="github:e/p1", resource_type="project", title="Spring project", url="https://github.com/e/p1", verification_status="vetted", resource_score=88, score_confidence=.7, link_status="healthy", language="English", topics=[]),
         LearningResource(id="discovered-project", provider="github", external_id="p2", canonical_key="github:e/p2", resource_type="project", title="Hidden", url="https://github.com/e/p2", verification_status="discovered", resource_score=95, score_confidence=.9, link_status="healthy", language="English", topics=[]),
     ]

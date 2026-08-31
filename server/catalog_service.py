@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import re
 import uuid
 
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -24,7 +24,7 @@ from database import LearningHistory, LearningResource, ResourceEvaluation, Reso
 from errors import APIError
 from profile_service import LearnerProfileService
 from resource_providers import canonical_resource_key
-from resource_policy import INELIGIBLE_LINK_STATUSES
+from resource_policy import INELIGIBLE_LINK_STATUSES, learner_eligible_resource_condition
 
 
 def _terms(values: list[str]) -> set[str]:
@@ -143,14 +143,7 @@ class CatalogService:
             LearningResource.archived_at.is_(None),
             LearningResource.suppressed_at.is_(None),
             LearningResource.link_status.notin_(INELIGIBLE_LINK_STATUSES),
-            or_(
-                LearningResource.verification_status == "verified",
-                and_(
-                    LearningResource.verification_status == "vetted",
-                    LearningResource.resource_score >= settings.RESOURCE_VETTED_SCORE_THRESHOLD,
-                    LearningResource.score_confidence >= settings.RESOURCE_MIN_CONFIDENCE,
-                ),
-            ),
+            learner_eligible_resource_condition(),
         )
         if resource_type:
             query = query.filter(LearningResource.resource_type == resource_type)

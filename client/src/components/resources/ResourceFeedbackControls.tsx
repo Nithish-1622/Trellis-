@@ -4,6 +4,7 @@ import type { ResourceInteractionType } from '../../services/resourceService'
 import type { RoadmapResource } from '../../services/roadmapService'
 
 const newSessionId = () => globalThis.crypto?.randomUUID?.() || `session-${Date.now().toString(36)}`
+const formatDuration = (seconds?: number | null) => seconds ? `${Math.round(seconds / 60)} min` : null
 
 export default function ResourceFeedbackControls({ resource, milestoneId }: { resource: RoadmapResource; milestoneId: string }) {
   const sessionId = useRef(newSessionId())
@@ -27,7 +28,7 @@ export default function ResourceFeedbackControls({ resource, milestoneId }: { re
       })
       if (eventType === 'helpful' || eventType === 'not_helpful') {
         setSentiment(eventType)
-        setMessage('Thank you for your feedback.')
+        setMessage('Your feedback was recorded. Thank you.')
       } else if (eventType === 'report') {
         setShowReport(false)
         setMessage('Report received. Trellis will reevaluate this resource.')
@@ -45,17 +46,25 @@ export default function ResourceFeedbackControls({ resource, milestoneId }: { re
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resource.id, milestoneId])
 
+  const duration = formatDuration(resource.duration_seconds)
+
   return <div className="p-3">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div className="flex flex-wrap items-start gap-3">
+      {resource.type === 'video' && resource.thumbnail_url && <img src={resource.thumbnail_url} alt={`${resource.title} thumbnail`} width={160} height={90} loading="lazy" className="aspect-video w-32 rounded-md object-cover sm:w-40" />}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
         <a href={resource.url} target="_blank" rel="noreferrer" onClick={() => void send('open')} className="font-semibold text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300">{resource.title} <span aria-hidden="true">↗</span></a>
+        {(resource.author || duration) && <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{[resource.author, duration].filter(Boolean).join(' · ')}</p>}
         <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{resource.provider} · {resource.explanation}</p>
         <p className="mt-1 text-xs capitalize text-zinc-500">{resource.status || 'verified'}{resource.score != null ? ` · ${Math.round(resource.score)} quality score` : ''}</p>
-      </div>
-      <div className="flex flex-wrap gap-2" aria-label={`Feedback for ${resource.title}`}>
+          </div>
+          <div className="flex flex-wrap gap-2" aria-label={`Feedback for ${resource.title}`}>
         <button type="button" aria-pressed={sentiment === 'helpful'} disabled={pending !== null} onClick={() => void send('helpful')} className="rounded-md border border-zinc-300 px-2.5 py-1.5 text-xs font-medium aria-pressed:border-emerald-600 aria-pressed:bg-emerald-50 dark:border-zinc-700 dark:aria-pressed:bg-emerald-950/40">Helpful</button>
         <button type="button" aria-pressed={sentiment === 'not_helpful'} disabled={pending !== null} onClick={() => void send('not_helpful')} className="rounded-md border border-zinc-300 px-2.5 py-1.5 text-xs font-medium aria-pressed:border-amber-600 aria-pressed:bg-amber-50 dark:border-zinc-700 dark:aria-pressed:bg-amber-950/40">Not helpful</button>
         <button type="button" aria-expanded={showReport} disabled={pending !== null} onClick={() => setShowReport((value) => !value)} className="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-700 underline-offset-2 hover:underline dark:text-red-300">Report</button>
+          </div>
+        </div>
       </div>
     </div>
     {showReport && <form className="mt-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-950" onSubmit={(event) => { event.preventDefault(); void send('report', reportReason.trim()) }}>

@@ -12,6 +12,9 @@ export interface RoadmapResource {
   score?: number
   confidence?: number
   score_version?: string | null
+  thumbnail_url?: string | null
+  duration_seconds?: number | null
+  author?: string | null
 }
 
 export interface RoadmapMilestone {
@@ -54,6 +57,9 @@ export const createRoadmap = (targetRole?: string) =>
   })
 
 export const getCurrentRoadmap = () => apiRequest<LearningRoadmap>('/v1/roadmaps/current')
+
+export const refreshRoadmapResources = (roadmapId: string) =>
+  apiRequest<LearningRoadmap>(`/v1/roadmaps/${roadmapId}/refresh-resources`, { method: 'POST', body: '{}' })
 
 export const updateMilestoneProgress = (
   roadmapId: string,

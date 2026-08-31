@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timedelta
 import math
 import re
 import uuid
 
-from sqlalchemy import and_, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth import AuthenticatedUser
@@ -23,10 +24,9 @@ from database import (
     RoadmapResourceAssignment,
     Skill,
 )
-from config import settings
 from errors import APIError
 from profile_service import LearnerProfileService
-from resource_policy import INELIGIBLE_LINK_STATUSES
+from resource_policy import INELIGIBLE_LINK_STATUSES, learner_eligible_resource_condition
 from roadmap_schemas import (
     MilestoneCompletion,
     MilestoneProgressUpdate,
@@ -167,6 +167,63 @@ class RoadmapService:
             raise APIError(status_code=404, code="ROADMAP_NOT_FOUND", message="Roadmap was not found")
         return self._response(roadmap)
 
+    def refresh_resources(self, identity: AuthenticatedUser, roadmap_id: str) -> RoadmapResponse:
+        roadmap = self.db.query(Roadmap).filter(
+            Roadmap.id == roadmap_id,
+            Roadmap.user_id == identity.user_id,
+            Roadmap.is_active.is_(True),
+        ).first()
+        if roadmap is None:
+            raise APIError(status_code=404, code="ROADMAP_NOT_FOUND", message="Active roadmap was not found")
+        base = self.db.query(RoadmapVersion).filter(
+            RoadmapVersion.roadmap_id == roadmap.id,
+            RoadmapVersion.status == "active",
+        ).first()
+        if base is None:
+            raise APIError(status_code=409, code="ACTIVE_VERSION_REQUIRED", message="An active roadmap version is required")
+
+        profile = LearnerProfileService(self.db).ensure_profile(identity)
+        version_number = (self.db.query(func.max(RoadmapVersion.version_number)).filter(
+            RoadmapVersion.roadmap_id == roadmap.id,
+        ).scalar() or 0) + 1
+        now = datetime.utcnow()
+        refreshed = RoadmapVersion(
+            id=str(uuid.uuid4()), roadmap_id=roadmap.id, version_number=version_number, status="active",
+            rationale="Learning resources refreshed from the verified and metadata-vetted index.",
+            change_summary={"resources_refreshed": True}, created_at=now, activated_at=now,
+        )
+        self.db.add(refreshed)
+        self.db.flush()
+
+        milestones = self.db.query(RoadmapMilestone).filter(
+            RoadmapMilestone.version_id == base.id,
+        ).order_by(RoadmapMilestone.sequence).all()
+        for item in milestones:
+            skill_name = (item.target_skills or [None])[0]
+            resources = self._resources_for(skill_name, profile.preferred_language) if skill_name else deepcopy(item.recommended_resources or [])
+            clone = RoadmapMilestone(
+                id=str(uuid.uuid4()), version_id=refreshed.id, stable_key=item.stable_key, title=item.title,
+                description=item.description, sequence=item.sequence, prerequisite_keys=deepcopy(item.prerequisite_keys or []),
+                target_skills=deepcopy(item.target_skills or []), estimated_hours=item.estimated_hours,
+                scheduled_start=item.scheduled_start, deadline=item.deadline, status=item.status,
+                progress_percentage=item.progress_percentage, recommended_resources=resources,
+                assessment_config=deepcopy(item.assessment_config or {}), explanation=deepcopy(item.explanation or {}),
+                reflection=item.reflection, completed_at=item.completed_at,
+            )
+            self.db.add(clone)
+            self.db.flush()
+            for sequence, resource in enumerate(resources, start=1):
+                self.db.add(RoadmapResourceAssignment(
+                    id=str(uuid.uuid4()), milestone_id=clone.id, resource_id=resource["id"], sequence=sequence,
+                    score_at_assignment=resource.get("score"), confidence_at_assignment=resource.get("confidence"),
+                    score_version=resource.get("score_version"), created_at=now,
+                ))
+
+        base.status = "superseded"
+        roadmap.last_updated = now
+        self.db.commit()
+        return self._response(roadmap)
+
     def update_milestone(self, identity: AuthenticatedUser, roadmap_id: str, milestone_id: str, update: MilestoneProgressUpdate) -> MilestoneResponse:
         _roadmap, _version, milestone = self._owned_milestone(identity, roadmap_id, milestone_id)
         milestone.progress_percentage = update.progress_percentage
@@ -207,14 +264,7 @@ class RoadmapService:
         resources = self.db.query(LearningResource).filter(
             LearningResource.archived_at.is_(None), LearningResource.suppressed_at.is_(None),
             LearningResource.link_status.notin_(INELIGIBLE_LINK_STATUSES),
-            or_(
-                LearningResource.verification_status == "verified",
-                and_(
-                    LearningResource.verification_status == "vetted",
-                    LearningResource.resource_score >= settings.RESOURCE_VETTED_SCORE_THRESHOLD,
-                    LearningResource.score_confidence >= settings.RESOURCE_MIN_CONFIDENCE,
-                ),
-            ),
+            learner_eligible_resource_condition(),
         ).all()
         resource_ids = [resource.id for resource in resources]
         indexed: dict[str, float] = {}
@@ -242,6 +292,12 @@ class RoadmapService:
         selected = []
         creator_counts: dict[str, int] = {}
         seen_types: set[str] = set()
+        youtube_video = next((item for item in ranked if item[1].provider.casefold() == "youtube" and item[1].resource_type == "video"), None)
+        if youtube_video:
+            selected.append(youtube_video)
+            creator = (youtube_video[1].author or youtube_video[1].provider).casefold()
+            creator_counts[creator] = 1
+            seen_types.add("video")
         for prefer_new_type in (True, False):
             for item in ranked:
                 if item in selected:
@@ -263,9 +319,11 @@ class RoadmapService:
             "id": item.id, "title": item.title, "provider": item.provider, "type": item.resource_type,
             "url": item.url, "status": item.verification_status, "score": round(score, 2),
             "confidence": round(confidence, 3), "score_version": item.score_version,
+            "thumbnail_url": item.thumbnail_url, "duration_seconds": item.duration_seconds,
+            "author": item.author,
             "explanation": (
                 f"Human-reviewed {item.resource_type} covering {skill_name}." if item.verification_status == "verified"
-                else f"Automatically vetted {item.resource_type} covering {skill_name}."
+                else f"Metadata-vetted {item.resource_type} covering {skill_name}."
             ),
             "provenance": "verified_catalog" if item.verification_status == "verified" else "vetted_index",
         } for _rank, item, score, confidence in selected]

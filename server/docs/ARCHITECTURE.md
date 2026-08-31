@@ -30,9 +30,9 @@ Resource-index coverage check
             ↓
          DISCOVERED
             ↓
-      automated quality vetting
+      deterministic metadata quality scoring
          ├── reject → REJECTED
-         └── score ≥ 80 and confidence ≥ .45 → VETTED
+         └── YouTube score ≥ 70; other score ≥ 80; confidence ≥ .45 → VETTED
             ↓
       versioned resource-skill index
             ↓
@@ -47,9 +47,9 @@ External discovery runs only for skills that lack two roadmap-eligible resources
 
 Provider candidates share a common contract. YouTube search IDs are resolved through authoritative video/channel details and rejected when private, unprocessed, non-embeddable, live, outside duration limits, language-mismatched, or spam-like. GitHub repositories must be active, non-empty, README-backed, and contain code. URLs normalize to identities such as `youtube:<video-id>` and `github:<owner>/<repo>` before uniqueness checks.
 
-## Trellis Resource Score v1
+## Trellis Resource Score v3
 
-Every automated evaluation stores its inputs' fingerprint, model version, evidence availability, component breakdown, final score, confidence, and `trellis-resource-score/v1` version:
+Every automated evaluation stores its input fingerprint, provider-metadata evidence, component breakdown, final score, confidence, and `trellis-resource-score/v3` version:
 
 - 40% semantic relevance
 - 20% content quality
@@ -57,7 +57,7 @@ Every automated evaluation stores its inputs' fingerprint, model version, eviden
 - 15% creator or repository credibility
 - 10% freshness
 
-Freshness half-lives are eight years for stable topics, three years for moderate topics, and one year for fast-moving topics. Transcript-backed structured Groq analysis is preferred for YouTube; metadata-only and provider-failure fallbacks cap confidence. Transcript text is analyzed in memory and never stored—only availability, language, content hash, coverage, and evaluation output are retained.
+Freshness half-lives are eight years for stable topics, three years for moderate topics, and one year for fast-moving topics. YouTube scoring is fully deterministic and uses validated title, description, duration, publication date, engagement, and channel statistics. It performs no transcript fetch and no LLM inference.
 
 Trust states are:
 
@@ -66,11 +66,11 @@ Trust states are:
 - `discovered`: valid but not yet roadmap-eligible.
 - `rejected`: safety, validation, relevance, or quality failure.
 
-Learners only see verified resources and vetted resources scoring at least 80. Ranking uses `score × (0.7 + 0.3 × confidence)`, adds an eight-point verified-resource trust boost, respects learner preferences/history/prerequisites, limits each creator to two resources per section, and favors a useful mix of formats. Archived, suppressed, broken, and unsafe resources never bypass these rules, including verified ones.
+Learners only see verified resources, metadata-vetted YouTube videos scoring at least 70, and other vetted resources scoring at least 80. Every automatically admitted resource must also pass the minimum confidence and relevance gates. Ranking uses `score × (0.7 + 0.3 × confidence)`, adds an eight-point verified-resource trust boost, respects language and skill relevance, limits each creator to two resources per section, favors a useful mix of formats, and retains one eligible YouTube video when available. Archived, suppressed, broken, and unsafe resources never bypass these rules, including verified ones.
 
 ## Feedback and optional human oversight
 
-The MVP records authenticated, idempotent impressions, opens, helpful/not-helpful choices, and reports. No IP address or user-agent is stored. Raw events are retained for 90 days, while non-identifying aggregates remain. Feedback does not modify score v1. Reports enqueue reevaluation and appear in the administrator exception console.
+The MVP records authenticated, idempotent impressions, opens, helpful/not-helpful choices, and reports. No IP address or user-agent is stored. Raw events are retained for 90 days, while non-identifying aggregates remain. Feedback does not modify score v3. Reports enqueue reevaluation and appear in the administrator exception console.
 
 Administrators handle exceptions rather than approving every provider result. Filters cover reports, low-confidence/high-score resources, score drops, stale content, heavily used resources, and unusual new creators. Verify, reject, pin, suppress, override, and reevaluate actions require reasons and produce audit records. Manual overrides remain separate from immutable algorithmic evaluations.
 
@@ -78,7 +78,7 @@ Administrators handle exceptions rather than approving every provider result. Fi
 
 Workers claim jobs with PostgreSQL `FOR UPDATE SKIP LOCKED`, use bounded exponential retries, and leave exhausted jobs inspectable. A database uniqueness key prevents duplicate discovery/evaluation spend. PostgreSQL advisory locks and unique job keys coordinate scheduled cleanup and reevaluation. Fast-moving, stale, heavily used, and negatively reported resources are reevaluated at bounded rates.
 
-Provider, transcript, LLM, or worker outages never block core roadmap generation. Trellis continues from its indexed verified/vetted collection and reports unresolved coverage gaps. Existing active roadmaps remain immutable; newly vetted resources affect new roadmaps or learner-approved adaptations only.
+Provider or worker outages never block core roadmap generation. Trellis continues from its indexed verified/vetted collection and reports unresolved coverage gaps. Existing active roadmap versions remain immutable; newly vetted resources affect new versions or learner-approved adaptations only. The roadmap's **Refresh video recommendations** action explicitly runs deterministic discovery and creates a new active version from the refreshed index.
 
 ## Learning and deployment flow
 

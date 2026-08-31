@@ -1,24 +1,23 @@
-"""Versioned, evidence-preserving automated resource quality evaluation."""
+"""Versioned, deterministic resource quality evaluation from provider metadata."""
 
-import asyncio
 from datetime import datetime, timezone
 import hashlib
 import json
-import logging
 import math
-from typing import Any, Protocol
+import re
+from typing import Any
 
-import httpx
-from langchain_groq import ChatGroq
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from config import settings
 from resource_providers import ExternalResource
+from resource_policy import automatic_score_threshold
 
 
-logger = logging.getLogger(__name__)
-SCORE_VERSION = "trellis-resource-score/v2"
+SCORE_VERSION = "trellis-resource-score/v3"
 _HALF_LIFE_YEARS = {"stable": 8.0, "moderate": 3.0, "fast_moving": 1.0}
+_PRACTICAL_MARKERS = ("build", "course", "example", "guide", "hands-on", "project", "tutorial", "workshop")
+_PROMOTIONAL_MARKERS = ("buy now", "guaranteed", "limited time", "sponsored", "use my code")
 
 
 class VettingContext(BaseModel):
@@ -39,12 +38,6 @@ class ContentAnalysis(BaseModel):
     coverage: list[str] = Field(max_length=30)
 
 
-class TranscriptDocument(BaseModel):
-    text: str = Field(min_length=1)
-    language: str | None = None
-    content_hash: str
-
-
 class EvaluationResult(BaseModel):
     score_version: str = SCORE_VERSION
     relevance_score: float
@@ -62,46 +55,6 @@ class EvaluationResult(BaseModel):
     transcript_content_hash: str | None = None
     coverage: list[str] = Field(default_factory=list)
     evidence: dict[str, Any] = Field(default_factory=dict)
-
-
-class StructuredVettingModel(Protocol):
-    async def ainvoke(self, prompt: str) -> ContentAnalysis | dict[str, Any]: ...
-
-
-class TranscriptClient:
-    def __init__(self, endpoint: str, api_key: str = "", transport: httpx.AsyncBaseTransport | None = None) -> None:
-        self.endpoint = endpoint
-        self.api_key = api_key
-        self.transport = transport
-
-    async def fetch(self, provider: str, external_id: str, language: str) -> TranscriptDocument | None:
-        if not self.endpoint:
-            return None
-        headers = {"Accept": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        try:
-            async with httpx.AsyncClient(timeout=settings.TRANSCRIPT_TIMEOUT_SECONDS, transport=self.transport) as client:
-                response = await client.get(
-                    self.endpoint,
-                    params={"provider": provider, "external_id": external_id, "language": language},
-                    headers=headers,
-                )
-                response.raise_for_status()
-            payload = response.json()
-            if not payload.get("available") or not isinstance(payload.get("text"), str):
-                return None
-            text = payload["text"].strip()[:settings.VETTING_TRANSCRIPT_MAX_CHARS]
-            if not text:
-                return None
-            return TranscriptDocument(
-                text=text,
-                language=payload.get("language"),
-                content_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            )
-        except (httpx.HTTPError, ValueError, ValidationError) as exc:
-            logger.warning("Transcript provider failed: %s", type(exc).__name__)
-            return None
 
 
 def _bounded_score(value: float) -> float:
@@ -166,11 +119,6 @@ def score_resource(
     analysis: ContentAnalysis,
     *,
     now: datetime | None = None,
-    transcript_available: bool = False,
-    transcript_language: str | None = None,
-    transcript_content_hash: str | None = None,
-    llm_used: bool = True,
-    model_version: str | None = None,
 ) -> EvaluationResult:
     evaluated_at = now or datetime.now(timezone.utc)
     age_days = _age_days(candidate.published_at, evaluated_at)
@@ -182,95 +130,58 @@ def score_resource(
     final = _bounded_score(0.40 * relevance + 0.20 * content + 0.15 * engagement + 0.15 * creator + 0.10 * freshness)
 
     completeness = sum((candidate.description is not None, candidate.published_at is not None, any(value is not None for value in candidate.metrics.model_dump().values()), candidate.author is not None)) / 4
-    confidence = 0.42 + 0.18 * completeness + (0.22 if transcript_available else 0) + (0.12 if llm_used else 0)
-    if not transcript_available:
-        confidence = min(confidence, 0.55)
-    if not llm_used:
-        confidence = min(confidence, 0.45)
-    confidence = round(min(confidence, 0.98), 3)
+    authoritative_provider = candidate.provider in {"youtube", "github"} and candidate.metadata.get("validation") is not None
+    confidence = round(min(0.5 + 0.2 * completeness + (0.1 if authoritative_provider else 0), 0.8), 3)
 
     safety_failure = analysis.promotional_content >= 70
-    if safety_failure or final < settings.RESOURCE_DISCOVERED_SCORE_THRESHOLD:
+    relevance_failure = relevance < 60 or not analysis.coverage
+    if safety_failure or relevance_failure or final < settings.RESOURCE_DISCOVERED_SCORE_THRESHOLD:
         status = "rejected"
-    elif final >= settings.RESOURCE_VETTED_SCORE_THRESHOLD and confidence >= settings.RESOURCE_MIN_CONFIDENCE:
+    elif final >= automatic_score_threshold(candidate.provider) and confidence >= settings.RESOURCE_MIN_CONFIDENCE:
         status = "vetted"
     else:
         status = "discovered"
     return EvaluationResult(
         relevance_score=relevance, content_quality_score=content, engagement_score=engagement,
         creator_score=creator, freshness_score=freshness, final_score=final, confidence=confidence,
-        status=status, model_version=model_version, input_fingerprint=_fingerprint(candidate, context, analysis),
-        transcript_available=transcript_available, transcript_language=transcript_language,
-        transcript_content_hash=transcript_content_hash, coverage=analysis.coverage,
+        status=status, model_version=None, input_fingerprint=_fingerprint(candidate, context, analysis),
+        transcript_available=False, coverage=analysis.coverage,
         evidence={
             "weights": {"relevance": 0.40, "content_quality": 0.20, "engagement": 0.15, "creator": 0.15, "freshness": 0.10},
-            "analysis": analysis.model_dump(mode="json"), "metadata_only": not transcript_available,
+            "analysis": analysis.model_dump(mode="json"), "metadata_only": True,
+            "method": "deterministic_metadata",
             "safety_failure": safety_failure,
+            "relevance_failure": relevance_failure,
         },
     )
 
 
 class ResourceVettingService:
-    def __init__(self, model: StructuredVettingModel | None = None, transcript_client: TranscriptClient | None = None) -> None:
-        self.model = model
-        if self.model is None and settings.GROQ_API_KEY and settings.RESOURCE_VETTING_ENABLED:
-            chat = ChatGroq(model=settings.GROQ_MODEL, api_key=settings.GROQ_API_KEY, temperature=0, timeout=10, max_retries=0)
-            self.model = chat.with_structured_output(ContentAnalysis, method="json_schema", strict=True)
-        self.transcript_client = transcript_client or TranscriptClient(settings.TRANSCRIPT_API_URL, settings.TRANSCRIPT_API_KEY)
-
     async def evaluate(self, candidate: ExternalResource, context: VettingContext) -> EvaluationResult:
-        transcript = None
-        if candidate.provider == "youtube" and self.transcript_client:
-            transcript = await self.transcript_client.fetch(candidate.provider, candidate.external_id, candidate.language)
-        evidence_text = transcript.text if transcript else (candidate.metadata.get("readme") or f"{candidate.title}\n{candidate.description or ''}")
-        analysis = self._fallback_analysis(candidate, context)
-        llm_used = False
-        model_failed = False
-        if self.model is not None:
-            prompt = self._prompt(candidate, context, str(evidence_text)[:settings.VETTING_TRANSCRIPT_MAX_CHARS])
-            try:
-                raw = await asyncio.wait_for(self.model.ainvoke(prompt), timeout=12)
-                analysis = raw if isinstance(raw, ContentAnalysis) else ContentAnalysis.model_validate(raw)
-                llm_used = True
-            except (TimeoutError, ValidationError, ValueError, TypeError) as exc:
-                model_failed = True
-                logger.warning("Resource evaluator rejected model output: %s", type(exc).__name__)
-            except Exception as exc:
-                model_failed = True
-                logger.warning("Resource evaluator failed: %s", type(exc).__name__)
-        result = score_resource(
-            candidate, context, analysis, transcript_available=transcript is not None,
-            transcript_language=transcript.language if transcript else None,
-            transcript_content_hash=transcript.content_hash if transcript else None,
-            llm_used=llm_used, model_version=settings.GROQ_MODEL if llm_used else None,
-        )
-        if model_failed and result.status == "vetted":
-            result = result.model_copy(update={"status": "discovered", "evidence": {**result.evidence, "model_output_rejected": True}})
-        return result
+        return score_resource(candidate, context, self._metadata_analysis(candidate, context))
 
     @staticmethod
-    def _fallback_analysis(candidate: ExternalResource, context: VettingContext) -> ContentAnalysis:
-        content = f"{candidate.title} {candidate.description or ''} {' '.join(candidate.topics)}".casefold()
-        skill_terms = [term for term in context.skill.casefold().replace("-", " ").split() if len(term) > 1]
-        matched = sum(term in content for term in skill_terms)
-        relevance = 45 + 45 * matched / max(len(skill_terms), 1)
-        documentation = 75 if candidate.metadata.get("readme") else 62
+    def _metadata_analysis(candidate: ExternalResource, context: VettingContext) -> ContentAnalysis:
+        title = candidate.title.casefold()
+        description = (candidate.description or "").casefold()
+        skill_terms = set(re.findall(r"[a-z0-9+#.]+", context.skill.casefold()))
+        title_match = sum(term in title for term in skill_terms) / max(len(skill_terms), 1)
+        description_match = sum(term in description for term in skill_terms) / max(len(skill_terms), 1)
+        relevance = 55 + 35 * title_match + 10 * description_match
+        description_quality = min(len(description) / 240, 1)
+        duration_minutes = (candidate.duration_seconds or 0) / 60
+        depth = 82 if duration_minutes >= 15 or candidate.metadata.get("readme") else 68
+        practicality = 88 if any(marker in f"{title} {description}" for marker in _PRACTICAL_MARKERS) else 72
+        promotion = 80 if any(marker in f"{title} {description}" for marker in _PROMOTIONAL_MARKERS) else 0
         return ContentAnalysis(
-            relevance=relevance, clarity=documentation, depth=documentation,
-            practicality=82 if candidate.resource_type == "project" else 68,
-            prerequisite_fit=65, outdated_risk=20, promotional_content=0,
-            coverage=[context.skill] if matched else [],
-        )
-
-    @staticmethod
-    def _prompt(candidate: ExternalResource, context: VettingContext, evidence: str) -> str:
-        return (
-            "Evaluate this learning resource on separate measurable 0-100 dimensions. Return only the required schema. "
-            "Relevance measures whether it teaches the named skill and objective; clarity measures explanation quality; "
-            "depth measures substantive coverage; practicality measures usable examples; prerequisite_fit measures fit for "
-            "the target level; outdated_risk and promotional_content are risks. Do not infer facts absent from evidence.\n"
-            f"Skill: {context.skill}\nLevel: {context.target_level or 'unspecified'}\nObjective: {context.objective or 'unspecified'}\n"
-            f"Title: {candidate.title}\nDescription: {candidate.description or ''}\nEvidence:\n{evidence}"
+            relevance=relevance,
+            clarity=72 + 16 * description_quality,
+            depth=depth,
+            practicality=practicality,
+            prerequisite_fit=82 if context.target_level and context.target_level.casefold() in f"{title} {description}" else 76,
+            outdated_risk=0,
+            promotional_content=promotion,
+            coverage=[context.skill] if title_match or description_match else [],
         )
 
 

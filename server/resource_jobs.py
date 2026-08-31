@@ -25,12 +25,13 @@ from database import (
 )
 from goal_skill_planner import GoalSkillService
 from resource_coverage import ResourceCoverageService
+from resource_policy import automatic_score_threshold
 from resource_providers import CreatorMetrics, ExternalResource, ProviderSearchRequest, ResourceMetrics, ResourceProvider
 from resource_vetting import EvaluationResult, ResourceVettingService, VettingContext
 
 
 logger = logging.getLogger(__name__)
-DISCOVERY_PIPELINE_VERSION = "v2"
+DISCOVERY_PIPELINE_VERSION = "v4"
 
 
 class Vetter(Protocol):
@@ -404,7 +405,7 @@ class ResourceDiscoveryService:
         if resource.verification_status != "verified":
             if safety_failed or selected.final_score < settings.RESOURCE_DISCOVERED_SCORE_THRESHOLD:
                 resource.verification_status = "rejected"
-            elif selected.final_score >= settings.RESOURCE_VETTED_SCORE_THRESHOLD and selected.confidence >= settings.RESOURCE_MIN_CONFIDENCE:
+            elif selected.final_score >= automatic_score_threshold(resource.provider) and selected.confidence >= settings.RESOURCE_MIN_CONFIDENCE:
                 resource.verification_status = "vetted"
             else:
                 resource.verification_status = "discovered"
