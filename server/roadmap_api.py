@@ -24,6 +24,11 @@ def get_current_roadmap(identity: Annotated[AuthenticatedUser, Depends(get_curre
     return RoadmapService(db).current(identity)
 
 
+@router.post("/{roadmap_id}/refresh-resources", response_model=RoadmapResponse)
+def refresh_roadmap_resources(roadmap_id: str, identity: Annotated[AuthenticatedUser, Depends(get_current_user)], db: Annotated[Session, Depends(get_db)]) -> RoadmapResponse:
+    return RoadmapService(db).refresh_resources(identity, roadmap_id)
+
+
 @router.get("/{roadmap_id}", response_model=RoadmapResponse)
 def get_roadmap(roadmap_id: str, identity: Annotated[AuthenticatedUser, Depends(get_current_user)], db: Annotated[Session, Depends(get_db)]) -> RoadmapResponse:
     return RoadmapService(db).get(identity, roadmap_id)

@@ -131,7 +131,7 @@ def test_recommendations_use_only_indexed_verified_and_vetted_resources(catalog_
     client, db, identity = catalog_client
     assert client.post("/v1/admin/resources", json=resource_payload()).status_code == 201
     db.add_all([
-        LearningResource(id="vetted", provider="youtube", external_id="video-1", canonical_key="youtube:video-1", resource_type="video", title="Backend API design", description="A current walkthrough", url="https://www.youtube.com/watch?v=video-1", topics=["APIs"], language="English", verification_status="vetted", resource_score=91, score_confidence=.82, score_version="trellis-resource-score/v1", link_status="healthy", resource_metadata={}, author="Teacher"),
+        LearningResource(id="vetted", provider="youtube", external_id="video-1", canonical_key="youtube:video-1", resource_type="video", title="Backend API design", description="A current walkthrough", url="https://www.youtube.com/watch?v=video-1", topics=["APIs"], language="English", verification_status="vetted", resource_score=72, score_confidence=.82, score_version="trellis-resource-score/v3", link_status="healthy", resource_metadata={}, author="Teacher"),
         LearningResource(id="discovered", provider="youtube", external_id="video-2", canonical_key="youtube:video-2", resource_type="video", title="Hidden API draft", url="https://www.youtube.com/watch?v=video-2", topics=["APIs"], language="English", verification_status="discovered", resource_score=79, score_confidence=.8, link_status="healthy", resource_metadata={}),
     ])
     db.commit()
@@ -151,7 +151,7 @@ def test_recommendations_use_only_indexed_verified_and_vetted_resources(catalog_
     items = response.json()["items"]
     assert {item["verification_status"] for item in items} == {"verified", "vetted"}
     vetted = next(item for item in items if item["verification_status"] == "vetted")
-    assert vetted["score"] == 91
+    assert vetted["score"] == 72
     assert vetted["confidence"] == .82
     assert vetted["why_recommended"]
     assert all(item["id"] != "discovered" for item in items)

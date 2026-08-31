@@ -1,15 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-import httpx
 import pytest
-import resource_vetting
-
 from resource_providers import CreatorMetrics, ExternalResource, ResourceMetrics
 from resource_vetting import (
     ContentAnalysis,
     ResourceVettingService,
     SCORE_VERSION,
-    TranscriptClient,
     VettingContext,
     score_resource,
 )
@@ -37,8 +33,8 @@ def test_current_score_is_reproducible_and_promotes_strong_evidence():
     context = VettingContext(skill="Spring Boot", target_level="intermediate", objective="Build APIs", freshness_class="fast_moving")
     now = datetime(2026, 8, 30, tzinfo=timezone.utc)
 
-    first = score_resource(youtube_candidate(published_at=now - timedelta(days=100)), context, strong_analysis(), now=now, transcript_available=True, llm_used=True)
-    second = score_resource(youtube_candidate(published_at=now - timedelta(days=100)), context, strong_analysis(), now=now, transcript_available=True, llm_used=True)
+    first = score_resource(youtube_candidate(published_at=now - timedelta(days=100)), context, strong_analysis(), now=now)
+    second = score_resource(youtube_candidate(published_at=now - timedelta(days=100)), context, strong_analysis(), now=now)
 
     assert first == second
     assert first.score_version == SCORE_VERSION
@@ -48,32 +44,30 @@ def test_current_score_is_reproducible_and_promotes_strong_evidence():
     assert first.input_fingerprint == second.input_fingerprint
 
 
-def test_metadata_only_and_no_llm_confidence_are_capped():
+def test_metadata_only_scoring_has_enough_confidence_for_verified_provider_metadata():
     context = VettingContext(skill="Spring Boot", objective="Build APIs")
-    result = score_resource(youtube_candidate(), context, strong_analysis(), transcript_available=False, llm_used=False)
+    result = score_resource(youtube_candidate(), context, strong_analysis())
 
-    assert result.confidence <= 0.45
+    assert result.confidence >= 0.45
+    assert result.model_version is None
+    assert result.evidence["method"] == "deterministic_metadata"
 
 
-def test_groq_vetter_uses_strict_json_schema_for_gpt_oss(monkeypatch):
-    structured_calls = []
+def test_metadata_scored_youtube_video_uses_the_youtube_admission_threshold(monkeypatch):
+    monkeypatch.setattr("resource_vetting.settings.YOUTUBE_METADATA_ELIGIBLE_SCORE_THRESHOLD", 70)
+    analysis = ContentAnalysis(
+        relevance=75, clarity=80, depth=80, practicality=80,
+        prerequisite_fit=80, outdated_risk=10, promotional_content=0,
+        coverage=["Spring Boot"],
+    )
 
-    class FakeChatGroq:
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
+    result = score_resource(
+        youtube_candidate(), VettingContext(skill="Spring Boot"), analysis,
+        now=datetime.now(timezone.utc),
+    )
 
-        def with_structured_output(self, schema, **kwargs):
-            structured_calls.append((schema, kwargs))
-            return object()
-
-    monkeypatch.setattr(resource_vetting, "ChatGroq", FakeChatGroq)
-    monkeypatch.setattr(resource_vetting.settings, "GROQ_API_KEY", "test-key")
-    monkeypatch.setattr(resource_vetting.settings, "GROQ_MODEL", "openai/gpt-oss-120b")
-    monkeypatch.setattr(resource_vetting.settings, "RESOURCE_VETTING_ENABLED", True)
-
-    ResourceVettingService()
-
-    assert structured_calls == [(ContentAnalysis, {"method": "json_schema", "strict": True})]
+    assert 70 <= result.final_score < 80
+    assert result.status == "vetted"
 
 
 def test_content_analysis_strict_schema_requires_every_property():
@@ -93,29 +87,25 @@ def test_freshness_penalizes_fast_moving_topics_more_than_stable_topics():
 
 
 @pytest.mark.asyncio
-async def test_transcript_client_uses_generic_authenticated_contract_without_persisting_raw_text():
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.headers["authorization"] == "Bearer transcript-secret"
-        assert request.url.params["provider"] == "youtube"
-        assert request.url.params["external_id"] == "video-1"
-        return httpx.Response(200, json={"available": True, "language": "en", "text": "Dependency injection explained."})
+async def test_vetting_service_promotes_strong_youtube_metadata_without_calling_a_model():
+    service = ResourceVettingService()
+    result = await service.evaluate(youtube_candidate(), VettingContext(skill="Spring Boot"))
 
-    client = TranscriptClient(endpoint="https://transcripts.example/v1/transcript", api_key="transcript-secret", transport=httpx.MockTransport(handler))
-    transcript = await client.fetch("youtube", "video-1", "English")
-
-    assert transcript is not None
-    assert transcript.text == "Dependency injection explained."
-    assert transcript.content_hash
+    assert result.status == "vetted"
+    assert result.model_version is None
+    assert result.transcript_available is False
+    assert result.evidence["method"] == "deterministic_metadata"
 
 
 @pytest.mark.asyncio
-async def test_vetting_service_rejects_malformed_model_output_instead_of_promoting():
-    class MalformedModel:
-        async def ainvoke(self, _prompt: str):
-            return {"relevance": 150, "clarity": "excellent"}
+async def test_vetting_service_does_not_promote_an_off_topic_popular_video():
+    candidate = youtube_candidate().model_copy(update={
+        "title": "How to plan your career",
+        "description": "General advice about setting professional goals.",
+        "topics": [],
+    })
 
-    service = ResourceVettingService(model=MalformedModel(), transcript_client=None)
-    result = await service.evaluate(youtube_candidate(), VettingContext(skill="Spring Boot"))
+    result = await ResourceVettingService().evaluate(candidate, VettingContext(skill="Spring Boot"))
 
     assert result.status != "vetted"
-    assert result.confidence <= 0.45
+    assert result.coverage == []

@@ -92,6 +92,57 @@ def test_vetted_resources_enter_new_roadmaps_without_admin_review_and_are_assign
     assert db.query(RoadmapResourceAssignment).filter_by(resource_id="vetted-api").count() == 1
 
 
+def test_roadmap_keeps_a_suitable_youtube_video_and_exposes_video_metadata(roadmap_client):
+    client, db, _identity = roadmap_client
+    complete_onboarding(client)
+    db.add_all([
+        LearningResource(id="course-api", provider="Catalog", external_id="course-api", resource_type="course", title="API design course", url="https://learn.example.test/course", topics=["API design"], language="English", verification_status="verified", resource_score=99, score_confidence=.99, link_status="healthy"),
+        LearningResource(id="article-api", provider="Catalog", external_id="article-api", resource_type="article", title="API design handbook", url="https://learn.example.test/article", topics=["API design"], language="English", verification_status="verified", resource_score=98, score_confidence=.99, link_status="healthy"),
+        LearningResource(id="project-api", provider="Catalog", external_id="project-api", resource_type="project", title="API design project", url="https://learn.example.test/project", topics=["API design"], language="English", verification_status="verified", resource_score=97, score_confidence=.99, link_status="healthy"),
+        LearningResource(id="youtube-api", provider="youtube", external_id="youtube-api", canonical_key="youtube:youtube-api", resource_type="video", title="API design tutorial", url="https://www.youtube.com/watch?v=youtube-api", thumbnail_url="https://i.ytimg.com/vi/youtube-api/mqdefault.jpg", duration_seconds=1800, author="API Teacher", topics=["API design"], language="English", verification_status="vetted", resource_score=72, score_confidence=.8, score_version="trellis-resource-score/v3", link_status="healthy"),
+    ])
+    db.commit()
+
+    response = client.post("/v1/roadmaps", json={"target_role": "Backend Developer"})
+
+    assert response.status_code == 201
+    api_milestone = next(item for item in response.json()["milestones"] if "api design" in item["target_skills"])
+    video = next(resource for resource in api_milestone["recommended_resources"] if resource["provider"] == "youtube")
+    assert video["thumbnail_url"] == "https://i.ytimg.com/vi/youtube-api/mqdefault.jpg"
+    assert video["duration_seconds"] == 1800
+    assert video["author"] == "API Teacher"
+
+
+def test_refreshing_resources_preserves_progress_and_creates_a_new_version(roadmap_client):
+    client, db, _identity = roadmap_client
+    complete_onboarding(client)
+    created = client.post("/v1/roadmaps", json={}).json()
+    api_milestone = created["milestones"][0]
+    milestone_skill = api_milestone["target_skills"][0]
+    assert client.patch(
+        f'/v1/roadmaps/{created["id"]}/milestones/{api_milestone["id"]}',
+        json={"progress_percentage": 25},
+    ).status_code == 200
+    db.add(LearningResource(
+        id="youtube-refresh", provider="youtube", external_id="youtube-refresh",
+        canonical_key="youtube:youtube-refresh", resource_type="video", title=f"{milestone_skill} tutorial",
+        url="https://www.youtube.com/watch?v=youtube-refresh", topics=[milestone_skill], language="English",
+        verification_status="vetted", resource_score=72, score_confidence=.8,
+        score_version="trellis-resource-score/v3", link_status="healthy",
+    ))
+    db.commit()
+
+    response = client.post(f'/v1/roadmaps/{created["id"]}/refresh-resources')
+
+    assert response.status_code == 200
+    refreshed = response.json()
+    assert refreshed["id"] == created["id"]
+    assert refreshed["version_number"] == 2
+    refreshed_api = next(item for item in refreshed["milestones"] if item["stable_key"] == api_milestone["stable_key"])
+    assert refreshed_api["progress_percentage"] == 25
+    assert any(item["id"] == "youtube-refresh" for item in refreshed_api["recommended_resources"])
+
+
 def test_completed_learning_prevents_redundant_foundation_milestone(roadmap_client):
     client, _db, _identity = roadmap_client
     complete_onboarding(client, completed_python=True)

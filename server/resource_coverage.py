@@ -1,12 +1,10 @@
 """Index-first coverage checks used to bound external resource discovery."""
 
 from pydantic import BaseModel
-from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from config import settings
 from database import LearnerGoalSkill, LearningResource, ResourceSkillMap, Skill
-from resource_policy import INELIGIBLE_LINK_STATUSES
+from resource_policy import INELIGIBLE_LINK_STATUSES, learner_eligible_resource_condition
 
 
 PRACTICAL_TYPES = {"project", "exercise", "assessment"}
@@ -46,14 +44,7 @@ class ResourceCoverageService:
                 LearningResource.archived_at.is_(None),
                 LearningResource.suppressed_at.is_(None),
                 LearningResource.link_status.notin_(INELIGIBLE_LINK_STATUSES),
-                or_(
-                    LearningResource.verification_status == "verified",
-                    and_(
-                        LearningResource.verification_status == "vetted",
-                        LearningResource.resource_score >= settings.RESOURCE_VETTED_SCORE_THRESHOLD,
-                        LearningResource.score_confidence >= settings.RESOURCE_MIN_CONFIDENCE,
-                    ),
-                ),
+                learner_eligible_resource_condition(),
             ).all()
             practical_count = sum(resource.resource_type in PRACTICAL_TYPES for resource in resources)
             instructional_count = sum(resource.resource_type in INSTRUCTIONAL_TYPES for resource in resources)

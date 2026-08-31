@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../services/apiClient'
-import { completeMilestone, createRoadmap, getCurrentRoadmap, updateMilestoneProgress } from '../services/roadmapService'
+import { completeMilestone, createRoadmap, getCurrentRoadmap, refreshRoadmapResources, updateMilestoneProgress } from '../services/roadmapService'
 import type { LearningRoadmap, RoadmapMilestone } from '../services/roadmapService'
 import AssessmentPanel from '../components/roadmap-components/AssessmentPanel'
 import AdaptationProposalPanel from '../components/roadmap-components/AdaptationProposalPanel'
@@ -8,6 +8,7 @@ import { createAdaptation, getPendingAdaptation } from '../services/adaptationSe
 import type { AdaptationProposal } from '../services/adaptationService'
 import type { AssessmentAttempt } from '../services/assessmentService'
 import ResourceFeedbackControls from '../components/resources/ResourceFeedbackControls'
+import { discoverResources, waitForDiscovery } from '../services/resourceService'
 
 const formatDate = (value: string | null) => value
   ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
@@ -21,6 +22,8 @@ export default function Roadmap() {
   const [error, setError] = useState<string | null>(null)
   const [hasNoRoadmap, setHasNoRoadmap] = useState(false)
   const [adaptation, setAdaptation] = useState<AdaptationProposal | null>(null)
+  const [isRefreshingRecommendations, setIsRefreshingRecommendations] = useState(false)
+  const [recommendationStatus, setRecommendationStatus] = useState<string | null>(null)
 
   const loadRoadmap = useCallback(async () => {
     setIsLoading(true)
@@ -92,6 +95,28 @@ export default function Roadmap() {
     }
   }
 
+  const refreshRecommendations = async () => {
+    if (!roadmap) return
+    setIsRefreshingRecommendations(true)
+    setRecommendationStatus('Checking YouTube for suitable course videos…')
+    setError(null)
+    try {
+      const job = await discoverResources()
+      const discovery = await waitForDiscovery(job.id, (progress) => {
+        setRecommendationStatus(`Checking YouTube for suitable course videos… ${progress.progress}%`)
+      })
+      if (discovery.status === 'dead') throw new Error('Video discovery did not complete. Please try again.')
+      setRecommendationStatus('Updating your roadmap with vetted videos…')
+      setRoadmap(await refreshRoadmapResources(roadmap.id))
+      setRecommendationStatus('Video recommendations refreshed.')
+    } catch (refreshError) {
+      setRecommendationStatus(null)
+      setError(refreshError instanceof Error ? refreshError.message : 'We could not refresh video recommendations.')
+    } finally {
+      setIsRefreshingRecommendations(false)
+    }
+  }
+
   const completedCount = roadmap?.milestones.filter((item) => item.status === 'completed').length || 0
   const overallProgress = roadmap?.milestones.length ? Math.round(roadmap.milestones.reduce((sum, item) => sum + item.progress_percentage, 0) / roadmap.milestones.length) : 0
 
@@ -116,7 +141,7 @@ export default function Roadmap() {
             {adaptation && <AdaptationProposalPanel proposal={adaptation} onAccepted={() => { setAdaptation(null); void loadRoadmap() }} onDismissed={() => setAdaptation(null)} />}
             <header className="grid gap-6 border-b border-zinc-200 pb-8 dark:border-zinc-800 md:grid-cols-[1fr_auto] md:items-end">
               <div><p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Version {roadmap.version_number} · Active</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{roadmap.target_role} roadmap</h1><p className="mt-3 max-w-2xl text-zinc-600 dark:text-zinc-300">{roadmap.objective}</p></div>
-              <div className="min-w-52"><div className="flex justify-between text-sm"><span>{completedCount} of {roadmap.milestones.length} milestones</span><strong>{overallProgress}%</strong></div><progress aria-label="Overall roadmap progress" value={overallProgress} max={100} className="mt-2 h-2 w-full accent-indigo-600" /><p className="mt-2 text-xs text-zinc-500">Estimated {roadmap.estimated_completion_weeks} weeks</p></div>
+              <div className="min-w-52"><div className="flex justify-between text-sm"><span>{completedCount} of {roadmap.milestones.length} milestones</span><strong>{overallProgress}%</strong></div><progress aria-label="Overall roadmap progress" value={overallProgress} max={100} className="mt-2 h-2 w-full accent-indigo-600" /><p className="mt-2 text-xs text-zinc-500">Estimated {roadmap.estimated_completion_weeks} weeks</p><button type="button" onClick={() => void refreshRecommendations()} disabled={isRefreshingRecommendations} className="mt-4 w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-950/40">{isRefreshingRecommendations ? 'Refreshing videos…' : 'Refresh video recommendations'}</button>{recommendationStatus && <p role="status" aria-live="polite" className="mt-2 max-w-64 text-xs text-zinc-600 dark:text-zinc-300">{recommendationStatus}</p>}</div>
             </header>
 
             <ol className="mt-8 space-y-6">

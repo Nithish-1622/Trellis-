@@ -17,7 +17,7 @@ from database import (
 )
 from goal_skill_planner import GoalSkillService
 from profile_service import LearnerProfileService
-from resource_jobs import ResourceDiscoveryService, ResourceJobService
+from resource_jobs import DISCOVERY_PIPELINE_VERSION, ResourceDiscoveryService, ResourceJobService
 from resource_coverage import ResourceCoverageService
 from resource_providers import ExternalResource, ResourceMetrics
 from resource_vetting import EvaluationResult, SCORE_VERSION
@@ -77,7 +77,7 @@ def test_current_discovery_version_does_not_reuse_legacy_completed_job(job_db):
 
     assert current.id != legacy.id
     assert current.status == "queued"
-    assert current.dedupe_key.endswith("discovery-v2")
+    assert current.dedupe_key.endswith(f"discovery-{DISCOVERY_PIPELINE_VERSION}")
 
 
 def test_project_only_catalog_does_not_satisfy_instructional_coverage(job_db):

@@ -59,10 +59,14 @@ class Settings(BaseSettings):
     RESOURCE_INTERACTION_RETENTION_DAYS: int = 90
     YOUTUBE_MIN_DURATION_SECONDS: int = 120
     YOUTUBE_MAX_DURATION_SECONDS: int = 14400
+    # Deprecated compatibility setting. Resource recommendations are scored
+    # deterministically and never invoke an LLM.
     RESOURCE_VETTING_ENABLED: bool = True
     RESOURCE_VETTED_SCORE_THRESHOLD: float = 80.0
+    YOUTUBE_METADATA_ELIGIBLE_SCORE_THRESHOLD: float = 70.0
     RESOURCE_DISCOVERED_SCORE_THRESHOLD: float = 60.0
     RESOURCE_MIN_CONFIDENCE: float = 0.45
+    # Deprecated compatibility settings retained for older environment files.
     TRANSCRIPT_API_URL: str = ""
     TRANSCRIPT_API_KEY: str = ""
     TRANSCRIPT_TIMEOUT_SECONDS: float = 8.0
