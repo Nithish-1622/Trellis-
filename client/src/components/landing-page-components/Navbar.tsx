@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import trellisLogo from '../../assets/trellis.png';
+import trellisLogo from '../../assets/trellis-logo.png';
 import { navLinks } from '../../data/landingPageData';
 import ThemeToggle from './ThemeToggle';
 
