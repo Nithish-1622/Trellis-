@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ReactNode } from 'react';
-import { useThemeContext } from '../../contexts/ThemeContext';
+import { useThemeContext } from '../../hooks/useThemeContext';
 import BackgroundGradients from '../landing-page-components/BackgroundGradients';
 import ThemeToggle from '../landing-page-components/ThemeToggle';
 import trellisLogo from '../../assets/trellis.png';

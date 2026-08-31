@@ -1,422 +1,108 @@
-# Trellis - AI-Powered Career Mentorship Platform
+# Trellis
 
-> An intelligent career mentorship platform that leverages AI agents to provide personalized guidance, job recommendations, and learning resources for career development.
+Trellis is a pilot-ready personalized learning platform. Learners describe a goal, confirm a structured profile, import prior learning, and receive an evidence-driven roadmap from Trellis's verified and automatically vetted resource index.
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-19.2-blue.svg)](https://react.dev/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Latest-purple.svg)](https://langchain-ai.github.io/langgraph/)
-[![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)](https://www.python.org/)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-orange.svg)](https://trellis.appwrite.network)
+## What is included
 
-## 🌐 Live Demo
+- Resumable hybrid onboarding with natural-language goal analysis and explicit review.
+- Normalized learner profiles, skills, history, assessments, and weighted evidence.
+- Prerequisite-aware, scheduled, versioned learning roadmaps.
+- Layered verified catalog plus automatically vetted YouTube and GitHub resources.
+- Progress, milestones, deterministic quizzes, provisional project rubrics, and dashboard insights.
+- Learner-approved roadmap adaptation that preserves completed work and prior versions.
+- Contextual assistant actions that cannot silently mutate a roadmap.
+- Persistent interview practice and lower-weight hiring-process evidence.
+- Learner helpfulness/report feedback and exception-focused administrator oversight.
+- A durable PostgreSQL worker for discovery, vetting, reevaluation, and retention cleanup.
 
-Check out the live application here: **[Trellis](https://trellis.appwrite.network)**
+Appwrite owns identity and resume object storage. PostgreSQL and Alembic own application data.
 
-Backend API docs: **[API Docs](https://trellis-api.saumyajit.dev/redoc)**
+## Run from the repository root
 
-## 🎯 Overview
+Copy configuration templates first:
 
-Trellis is a full-stack career mentorship platform that combines the power of AI agents, large language models, and real-time data to provide personalized career guidance. The platform helps users:
+```bash
+cp .env.example .env
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
 
-- 📄 **Parse and analyze resumes** to extract skills, experience, and qualifications
-- 💼 **Discover real job opportunities** from LinkedIn, Indeed, Glassdoor, and other platforms
-- 📊 **Analyze market trends** including salary insights, demand forecasts, and skill gaps
-- 📚 **Get personalized learning recommendations** tailored to career goals
-- 🗺️ **Generate custom learning roadmaps** with milestones and progress tracking
-- 💬 **Chat with an AI career mentor** for guidance and advice
+Set the same Appwrite project in `server/.env` and `client/.env`. Configure `ADMIN_USER_IDS` with comma-separated Appwrite user IDs. YouTube, GitHub, Groq, and the transcript adapter are configured in `server/.env`; provider-independent indexed content and deterministic fallbacks remain available when any integration is unavailable.
 
-## 🏗️ Architecture
+Development with live reload:
 
-![System Architecture](./images/trellis_architecture.png)
+```bash
+make dev
+```
 
-### Tech Stack
+- Client: http://localhost:5173
+- API: http://localhost:8085
+- API docs: http://localhost:8085/docs
 
-**Backend:**
+Production-style local deployment:
 
-- **FastAPI** - Modern, high-performance Python web framework
-- **LangGraph** - Stateful AI agent orchestration framework
-- **PostgreSQL** - Primary database with pgvector extension
-- **Groq (Llama 3.3 70B)** - High-performance LLM for agent reasoning and resume parsing
-- **Google Gemini Embeddings** (`text-embedding-004`) - Semantic search and memory
-- **JSearch API** (RapidAPI) - Real-time job data aggregation
+```bash
+make prod
+```
 
-**Frontend:**
+- Client: http://localhost:8098
+- API: http://localhost:8088
+- The client proxies `/api/*` to the internal API container.
 
-- **React 19** - Modern UI with hooks and concurrent features
-- **TypeScript** - Type-safe development
-- **Bun** - Fast JavaScript runtime & package manager
-- **Vite** - Lightning-fast build tool
-- **Tailwind CSS 4** - Utility-first styling
-- **React Router 7** - Client-side routing
-- **Appwrite** - Authentication, User Management, and File Storage
+Use `make help` for logs, status, builds, migrations, tests, and teardown commands. `make destroy` and `make dev-destroy` remove the PostgreSQL volume and are intentionally destructive.
 
-**AI & ML:**
+## Quality gates
 
-- **LangChain** - LLM application framework
-- **Groq API** - Ultra-fast inference for Llama models
-- **Google Generative AI** - Semantic embeddings
-- **LangGraph State Machine** - Conversational agent state management
+```bash
+make config
+make test
+make lint
+make e2e
+```
 
-## ✨ Key Features
+The API container applies Alembic migrations during startup. They can also be run explicitly with `make migrate` and inspected with `make migration-current`.
 
-### 1. 🗺️ Dynamic Roadmap Agent
-- **Intelligent Planning**: Instead of static templates, the agent acts as an intelligent planner.
-- **Role Inference**: Analyzes user skills (e.g., Python + Pandas) to infer best-fit roles (e.g., "Data Scientist") if none are specified.
-- **Skill Gap Analysis**: Compares user profile against real-time market trends to identify missing skills.
-- **Agentic Planning**: Generates multi-step learning paths with specific, action-oriented milestones (e.g., "Deploy Microservices on AWS").
+## API conventions
 
-### 2. 🤖 AI Mock Interviewer
-- **Real-time Technical Interviews**: Conducts text-based technical interviews.
-- **Dynamic Questioning**: Generates relevant questions based on target role and difficulty level.
-- **Feedback Loop**: Analyzes user answers and provides immediate feedback on correctness and clarity.
-- **Performance Report**: Generates a summary of strengths and areas for improvement.
+All product endpoints are under `/v1`. Except for health endpoints, requests use a short-lived Appwrite JWT:
 
-### 3. 📄 Resume & Profile Engine
-- **AI-Powered Parsing**: Parses PDF/DOCX resumes to extract skills, education, and experience automatically.
-- **Appwrite Storage**: Securely uploads and persists resume files.
-- **Profile Generation**: Populates the UserProfile database to personalize all other features.
+```http
+Authorization: Bearer <appwrite-jwt>
+```
 
-### 4. 💼 Job Recommendation Engine
-- **Smart Matching**: Matches structured user profiles against job opportunities.
-- **Market Analysis**: Analyzes market trends (salary, demand) for specific roles.
-- **Real-time Data**: Aggregates jobs from major platforms via JSearch API.
-
-### 5. 🧠 Long-term Memory
-- **Context Awareness**: Remembers past interactions, completed milestones, and interview performance.
-- **Evolving Guidance**: Allows the "Mentor" to give context-aware advice that evolves as the user learns.
-
-### 6. 📊 Market Trends Analysis
-- AI-powered analysis of current market conditions
-- Salary insights and compensation trends
-- Job demand forecasting
-- Industry-specific recommendations
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Docker & Docker Compose**
-- **API Keys**:
-  - **Groq API Key** (for Llama 3.3 reasoning)
-  - **Google Gemini API Key** (for Embeddings)
-  - **JSearch API** (RapidAPI)
-  - **Appwrite Project & Bucket ID**
-
-### Docker Setup
-
-1.  **Clone the repository**
-
-    ```bash
-    git clone https://github.com/agspades/trellis.git
-    cd trellis
-    ```
-
-2.  **Configure the backend and frontend environments**
-
-    ```bash
-    cp server/.env.example server/.env
-    cp client/.env.example client/.env
-    ```
-
-    Add your API keys to `server/.env` and your Appwrite public configuration
-    to `client/.env`. Compose supplies the PostgreSQL connection and browser API
-    proxy settings, so those do not need to be changed in either file.
-
-3.  **Run the production stack**
-
-    ```bash
-    docker compose up -d --build
-    ```
-
-    - Trellis: `http://localhost:8098`
-    - API: `http://localhost:8088`
-    - API docs: `http://localhost:8088/docs`
-    - PostgreSQL is only reachable by other containers.
-
-    The client forwards `/api/*` requests to the internal API service. Stop the
-    stack with `docker compose down`. Database data remains in the `pgdata`
-    named volume; use `docker compose down --volumes` only when you intend to
-    delete it.
-
-4.  **Run the live-reload development stack**
-
-    ```bash
-    docker compose -f compose.yaml -f compose.dev.yaml up --build
-    ```
-
-    - Vite client with HMR: `http://localhost:5173`
-    - Reloading API: `http://localhost:8085`
-    - API docs: `http://localhost:8085/docs`
-    - PostgreSQL: `localhost:5432`
-
-    Changes under `client/` and `server/` are bind-mounted into their respective
-    containers. Stop this stack with:
-
-    ```bash
-    docker compose -f compose.yaml -f compose.dev.yaml down
-    ```
-
-    The same workflows are available as shorter Make targets:
-
-    ```bash
-    make prod       # production
-    make dev        # development with live reload
-    make down       # stop production
-    make dev-down   # stop development
-    make help       # list all shortcuts
-    ```
-
-## 📡 API Endpoints
-
-### Health & Status
-
-- `GET /` - Health check and API version
-
-### Agent Interactions
-
-- `POST /agent/message` - Send message to AI career mentor
-- `GET /agent/memory/summary` - Get user's memory summary
-- `GET /agent/progress` - Get weekly progress insights
-
-### Resume & Profile
-
-- `POST /agent/resume/parse` - Upload and parse resume (PDF/DOCX)
-- Returns structured data: name, email, skills, experience, education
-
-### Job Recommendations
-
-- `POST /agent/jobs/recommend` - Get personalized job recommendations
+Ownership is derived from that token and never accepted from a request body. Errors use one envelope:
 
 ```json
 {
-  "user_id": "user_123",
-  "limit": 10,
-  "location": "Remote",
-  "employment_type": "FULLTIME"
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": []
+  }
 }
 ```
 
-### Market Trends
+Primary endpoint groups:
 
-- `POST /agent/market/trends` - Analyze market trends for target role
+- `/v1/me/*` — onboarding, profile, history, resume evidence, skills, dashboard.
+- `/v1/roadmaps/*` — generation, versions, milestone progress, assessments, adaptations.
+- `/v1/resources/recommendations` — ranked verified and vetted index resources.
+- `/v1/resources/discover` and `/v1/resources/discovery-jobs/{id}` — idempotent asynchronous coverage discovery.
+- `/v1/resources/{id}/interactions` — privacy-bounded learner feedback.
+- `/v1/chat/messages` — contextual learner assistant.
+- `/v1/career/*` — real job links, applications, and persistent interview evidence.
+- `/v1/admin/resources/*` — catalog management, evaluation history, and exception moderation.
+- `/v1/admin/operations/metrics` — content-free pilot aggregates.
 
-```json
-{
-  "user_id": "user_123"
-}
-```
+Legacy unversioned agent endpoints have been removed.
 
-### Learning Resources
+## Operational notes
 
-- `POST /agent/learning/resources` - Get personalized learning recommendations
+- `PILOT_FEATURE_ENABLED=false` hides product routes while leaving health checks available.
+- `/health/ready` verifies database connectivity and is used by Docker health checks.
+- Provider and AI operations have bounded timeouts, retries, user-scoped rate limits, and deterministic/catalog fallbacks.
+- Operational metrics contain counts and latency aggregates only; learner prompts and answers are not recorded.
+- YouTube and GitHub are discovery backends, not learner-facing databases. Validated candidates are scored and indexed before use, so AI cannot invent resource URLs.
+- The worker is deliberately a second process using the API image; PostgreSQL supplies durable jobs and `SKIP LOCKED` claiming, so no Redis service is required.
 
-```json
-{
-  "user_id": "user_123",
-  "topic": "Python Backend Development",
-  "difficulty": "intermediate"
-}
-```
-
-### Roadmaps & Progress
-
-- `POST /agent/roadmap/regenerate` - Generate new learning roadmap
-- `POST /agent/milestone/complete` - Mark milestone as completed
-- `POST /agent/job/application` - Log job application outcome
-
-## 🧪 Testing
-
-### Test Resume Parsing
-
-```bash
-# Place test PDF in test-docs/ directory
-cd server
-python -c "
-from resume_parser import resume_parser
-result = resume_parser.parse_resume('test-docs/sample_resume.pdf')
-print(result)
-"
-```
-
-### Test Job Recommendations
-
-```bash
-# Direct test of JSearch API integration
-cd server
-python test_jsearch.py
-```
-
-### Test API Endpoints
-
-```bash
-# Using curl
-curl -X POST http://localhost:8000/agent/jobs/recommend \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "test_user",
-    "limit": 5
-  }'
-```
-
-## 📁 Project Structure
-
-```
-trellis/
-├── client/                    # React frontend
-│   ├── src/
-│   │   ├── pages/            # Page components
-│   │   ├── auth-components/  # Authentication UI
-│   │   ├── landing-page-components/
-│   │   ├── profile-components/
-│   │   ├── roadmap-components/
-│   │   ├── contexts/         # React contexts
-│   │   ├── hooks/            # Custom hooks
-│   │   ├── lib/              # Utilities (Appwrite)
-│   │   └── main.tsx          # Entry point
-│   ├── package.json
-│   └── vite.config.ts
-│
-├── server/                    # FastAPI backend
-│   ├── main.py               # FastAPI app & endpoints (11 endpoints)
-│   ├── database.py           # SQLAlchemy models & setup
-│   ├── config.py             # Pydantic settings
-│   ├── schemas.py            # Request/response models
-│   ├── services.py           # CareerMentorService (LangGraph agent)
-│   ├── resume_parser.py      # Resume parsing with Groq/Llama 3.3
-│   ├── job_recommender.py    # Job matching with JSearch + Gemini Embeddings
-│   ├── learning_resources.py # Learning resource recommendations
-│   ├── requirements.txt      # Python dependencies
-│   ├── .env.example          # Environment template
-│   ├── test_jsearch.py       # JSearch API test script
-│   └── docs/
-│       └── JSEARCH_SETUP.md  # JSearch API setup guide
-│
-└── README.md                  # This file
-```
-
-## 🔑 API Keys Setup
-
-### 1. Groq (Llama 3.3)
-
-1. Visit [console.groq.com](https://console.groq.com/)
-2. Create account and generate API key
-3. Add to `.env`: `GROQ_API_KEY=gsk_...`
-
-### 2. Google Gemini (Embeddings/Memory)
-
-1. Visit [aistudio.google.com](https://aistudio.google.com/)
-2. Create account and generate API key
-3. Add to `.env`: `GOOGLE_API_KEY=AIza...`
-
-### 3. JSearch API (RapidAPI)
-
-1. Visit [rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch](https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch)
-2. Subscribe to Basic plan (100 requests/month free)
-3. Copy API key from "Code Snippets" section
-4. Add to `.env`:
-
-```env
-JSEARCH_API_KEY=your_key_here
-JSEARCH_API_HOST=jsearch.p.rapidapi.com
-```
-
-Detailed setup: [server/docs/JSEARCH_SETUP.md](server/docs/JSEARCH_SETUP.md)
-
-## 🔧 Configuration
-
-Key settings in `server/config.py`:
-
-```python
-# Database
-DATABASE_URL = "postgresql://..."
-
-# AI Models
-GROQ_API_KEY = "gsk_..."
-GROQ_MODEL = "llama-3.3-70b-versatile"
-GOOGLE_API_KEY = "AIza..." # For Embeddings
-
-# JSearch API
-JSEARCH_API_KEY = "..."
-JSEARCH_API_HOST = "jsearch.p.rapidapi.com"
-
-# Application
-APP_NAME = "Trellis Career Mentor"
-LOG_LEVEL = "INFO"
-```
-
-## 🐛 Troubleshooting
-
-### Resume Parser Returns Empty Data
-
-- **Cause**: PDF is image-based (scanned document)
-- **Solution**: Use text-based PDFs or add OCR support (Tesseract)
-
-### JSearch API Returns 0 Jobs
-
-- **Cause**: Query too specific or rate limit reached
-- **Solution**: Simplify search query or wait 60 seconds between requests
-- **Free tier limit**: 100 requests/month
-
-### Database Connection Error
-
-- **Check**: PostgreSQL is running (`sudo systemctl status postgresql`)
-- **Check**: Database exists (`psql -l | grep trellis_db`)
-- **Check**: pgvector extension installed (`psql trellis_db -c "\dx"`)
-
-### Import Errors
-
-- **Solution**: Ensure virtual environment is activated
-- **Solution**: Reinstall dependencies: `pip install -r requirements.txt`
-
-## 🚧 Known Limitations
-
-1. **Resume Parser**: Only works with text-based PDFs (not scanned images)
-2. **JSearch API**: Free tier limited to 100 requests/month
-3. **Real-time Data**: Job listings may have slight delays (API caching)
-4. **Semantic Matching**: Match scores are estimates based on text similarity
-
-## 🔮 Future Enhancements
-
-- [ ] Add OCR support for image-based PDFs (Tesseract/AWS Textract)
-- [x] Implement caching for JSearch API responses
-- [x] Add interview preparation module
-- [ ] Integration with more job boards (LinkedIn Jobs API)
-- [ ] Resume builder and optimization suggestions
-- [ ] Salary negotiation guidance
-- [ ] Company culture insights
-- [ ] Networking recommendations
-
-## 👥 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- **Groq** for ultra-fast Llama 3.3 inference
-- **Google Gemini** for semantic embeddings
-- **Appwrite** for seamless backend services
-- **RapidAPI/JSearch** for job data aggregation
-- **LangChain** and **LangGraph** for AI orchestration
-- **FastAPI** for high-performance API handling
-
-## 📞 Support
-
-For questions or issues:
-
-- Open an issue on GitHub
-- Check the [documentation](server/docs/)
-- Review API docs here: [API Docs](https://trellis-api.saumyajit.dev/redoc)
-
----
-
-Built with ❤️ using LangGraph, FastAPI, and React
+Architecture and test details are in [server/docs/ARCHITECTURE.md](server/docs/ARCHITECTURE.md) and [server/docs/TESTING.md](server/docs/TESTING.md).

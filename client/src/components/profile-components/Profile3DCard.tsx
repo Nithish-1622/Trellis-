@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useThemeContext } from '../../contexts/ThemeContext';
+import { useThemeContext } from '../../hooks/useThemeContext';
 
 interface Profile3DCardProps {
     name: string;

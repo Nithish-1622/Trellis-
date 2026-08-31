@@ -1,12 +1,13 @@
 import React from 'react';
-import AuthLayout from '../components/auth-components/AuthLayout';
-import OnboardingForm from '../components/onboarding-components/OnboardingForm';
+import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 
 const Onboarding: React.FC = () => {
     return (
-        <AuthLayout maxWidth="max-w-2xl">
-            <OnboardingForm />
-        </AuthLayout>
+        <div>
+            <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+                <OnboardingWizard />
+            </main>
+        </div>
     );
 };
 

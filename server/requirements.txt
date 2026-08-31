@@ -35,7 +35,7 @@ h11
 httptools
 websockets
 watchfiles
-uvloopuvloop; sys_platform != "win32"
+uvloop; sys_platform != "win32"
 
 # Serialization & Performance
 orjson
@@ -62,7 +62,7 @@ numpy
 pandas
 
 # Document Parsing
-PyPDF2
+pypdf
 python-docx
 beautifulsoup4
 lxml
@@ -80,4 +80,3 @@ google-genai
 huggingface_hub
 tokenizers
 protobuf
-

@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
-import { startInterview, submitInterviewAnswer, getInterviewReport } from '../services/agentService';
+import { useThemeContext } from '../hooks/useThemeContext';
+import { useAuth } from '../hooks/useAuth';
+import { startInterview, submitInterviewAnswer, getInterviewReport } from '../services/careerService';
+import type { InterviewReport } from '../services/careerService';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
 
 const InterviewPrep: React.FC = () => {
     const { darkMode } = useThemeContext();
     const { user } = useAuth();
+    const savedTargetRole = user?.prefs.target_role;
 
     // Stages: 'setup', 'interview', 'report'
     const [stage, setStage] = useState<'setup' | 'interview' | 'report'>('setup');
 
     // Setup State
-    const [targetRole, setTargetRole] = useState(user?.target_role || "Software Engineer");
+    const [targetRole, setTargetRole] = useState(
+        typeof savedTargetRole === 'string' ? savedTargetRole : 'Software Engineer',
+    );
     const [focusArea, setFocusArea] = useState("React & System Design");
     const [isLoading, setIsLoading] = useState(false);
 
@@ -25,14 +29,16 @@ const InterviewPrep: React.FC = () => {
     const MAX_QUESTIONS = 5;
 
     // Report State
-    const [report, setReport] = useState<any>(null);
+    const [report, setReport] = useState<InterviewReport | null>(null);
 
     const handleStart = async () => {
+        if (!user) return;
+
         setIsLoading(true);
         try {
-            const data = await startInterview(user.$id, targetRole, focusArea);
+            const data = await startInterview(targetRole, focusArea);
             setSessionId(data.session_id);
-            setCurrentQuestion(data.question);
+            setCurrentQuestion(data.question || 'Interview complete.');
             setStage('interview');
             setQuestionCount(1);
         } catch (error) {
@@ -44,10 +50,10 @@ const InterviewPrep: React.FC = () => {
     };
 
     const handleSubmitAnswer = async () => {
-        if (!userAnswer.trim()) return;
+        if (!user || !userAnswer.trim()) return;
         setIsLoading(true);
         try {
-            const data = await submitInterviewAnswer(user.$id, sessionId!, userAnswer);
+            const data = await submitInterviewAnswer(sessionId!, userAnswer);
 
             // Update feedback from previous turn
             if (data.previous_feedback) {
@@ -57,10 +63,10 @@ const InterviewPrep: React.FC = () => {
                 });
             }
 
-            if (data.state === 'completed') {
+            if (data.status === 'completed') {
                 await fetchReport(data.session_id);
             } else {
-                setCurrentQuestion(data.question);
+                setCurrentQuestion(data.question || 'Interview complete.');
                 setUserAnswer("");
                 setQuestionCount(prev => prev + 1);
             }
@@ -86,10 +92,10 @@ const InterviewPrep: React.FC = () => {
     };
 
     return (
-        <div className={`min-h-screen font-sans relative flex flex-col ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
+        <div className="relative flex flex-col font-sans">
             <BackgroundGradients />
 
-            <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-24 relative z-10">
+            <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-4 py-12">
                 {/* Header */}
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
@@ -196,7 +202,7 @@ const InterviewPrep: React.FC = () => {
                         <div className={`text-center p-10 rounded-3xl border ${darkMode ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-zinc-100'}`}>
                             <h2 className="text-2xl font-bold mb-2">Interview Completed!</h2>
                             <div className="text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500 mb-4">
-                                {report.overall_score}
+                                {Math.round((report.overall_score || 0) * 100)}
                             </div>
                             <p className="text-sm uppercase tracking-widest opacity-60">Overall Score</p>
                             <p className="mt-6 max-w-2xl mx-auto opacity-80 leading-relaxed">

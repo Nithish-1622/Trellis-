@@ -1,144 +1,46 @@
-import React, { useState } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
-import { Link } from 'react-router-dom';
-import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
-import ProfileNavbar from '../components/profile-components/ProfileNavbar';
-import ProfileHeader from '../components/profile-components/ProfileHeader';
-import DashboardOverview from '../components/profile-components/DashboardOverview';
-import CourseExplorer from '../components/profile-components/CourseExplorer';
-import ProfileSettings from '../components/profile-components/ProfileSettings';
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import { getDashboard } from '../services/dashboardService'
+import type { DashboardData } from '../services/dashboardService'
 
-import { useAuth } from '../contexts/AuthContext';
-import { getMemorySummary } from '../services/agentService';
+const formatDate = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 
-const Profile: React.FC = () => {
-    const { darkMode, toggleTheme } = useThemeContext();
-    const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'settings'>('overview');
+export default function Profile() {
+  const { user } = useAuth()
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-    // Profile State (Shared across Navbar, Header, Settings)
-    const [name, setName] = useState(user?.name || 'John Doe');
-    const [email, setEmail] = useState(user?.email || 'john@example.com');
-    const [bio, setBio] = useState('Passionate learner exploring the world of technology.');
+  const load = async () => {
+    setIsLoading(true); setError(null)
+    try { setDashboard(await getDashboard()) }
+    catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'We could not load your dashboard.') }
+    finally { setIsLoading(false) }
+  }
 
-    // Dynamic Stats State
-    const [stats, setStats] = useState<{
-        skillsCount: number;
-        milestonesCompleted: number;
-        applicationsTracked: number;
-        currentFocus: string | null;
-    }>({
-        skillsCount: 0,
-        milestonesCompleted: 0,
-        applicationsTracked: 0,
-        currentFocus: null
-    });
+  useEffect(() => { void load() }, [])
 
-    React.useEffect(() => {
-        if (user) {
-            setName(user.name);
-            setEmail(user.email);
+  return <div>
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-zinc-500">Welcome back{user?.name ? `, ${user.name}` : ''}</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Your learning dashboard</h1></div><Link to="/onboarding?edit=1" className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-900">Edit learning profile</Link></div>
+      {error && <div role="alert" className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">{error} <button type="button" onClick={() => void load()} className="font-semibold underline">Try again</button></div>}
+      {isLoading ? <div aria-busy="true" aria-label="Loading dashboard" className="mt-8 grid gap-4 md:grid-cols-3"><div className="h-32 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" /><div className="h-32 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" /><div className="h-32 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" /></div>
+        : dashboard && <>
+          <section aria-labelledby="next-action" className="mt-8 rounded-xl bg-zinc-900 p-6 text-white dark:bg-white dark:text-zinc-950"><p className="text-xs font-semibold uppercase tracking-wide opacity-70">Recommended next action</p><h2 id="next-action" className="mt-2 text-2xl font-bold">{dashboard.next_action.title}</h2><p className="mt-2 max-w-3xl text-sm leading-6 opacity-80">{dashboard.next_action.explanation}</p><Link to={dashboard.next_action.href} className="mt-5 inline-flex rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-950 dark:bg-zinc-950 dark:text-white">Continue learning</Link></section>
 
-            // Fetch stats
-            getMemorySummary(user.$id).then(data => {
-                setStats({
-                    skillsCount: data.skills?.length || 0,
-                    milestonesCompleted: data.completed_milestones || 0,
-                    applicationsTracked: data.total_applications || 0,
-                    currentFocus: data.current_focus // Allow null
-                });
-                if (data.resume_filename) {
-                    setResumeName(data.resume_filename);
-                }
-            }).catch(err => console.error("Failed to fetch profile stats:", err));
-        }
-    }, [user]);
+          <section aria-label="Progress summary" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><p className="text-sm text-zinc-500">Roadmap progress</p><p className="mt-2 text-3xl font-bold">{dashboard.roadmap?.progress_percentage || 0}%</p><p className="mt-1 text-xs text-zinc-500">{dashboard.roadmap ? `${dashboard.roadmap.completed_milestones} of ${dashboard.roadmap.total_milestones} milestones` : 'No roadmap yet'}</p></div>
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><p className="text-sm text-zinc-500">This week</p><p className="mt-2 text-3xl font-bold">{Math.round(dashboard.weekly_effort_minutes / 60 * 10) / 10}h</p><p className="mt-1 text-xs text-zinc-500">Recorded learning effort</p></div>
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><p className="text-sm text-zinc-500">Consistency</p><p className="mt-2 text-3xl font-bold">{dashboard.streak_days}</p><p className="mt-1 text-xs text-zinc-500">{dashboard.streak_days} day streak</p></div>
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><p className="text-sm text-zinc-500">Skill evidence</p><p className="mt-2 text-3xl font-bold">{dashboard.skill_growth.reduce((sum, skill) => sum + skill.evidence_count, 0)}</p><p className="mt-1 text-xs text-zinc-500">Weighted observations</p></div>
+          </section>
 
-    const [photo, setPhoto] = useState<string | null>(null);
-    const [resumeName, setResumeName] = useState<string | null>(null);
-
-    const getInitials = (n: string) => {
-        return n.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
-    };
-
-    return (
-        <div className={`min-h-screen font-sans transition-all duration-700 ease-in-out relative flex flex-col ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
-            <BackgroundGradients />
-
-            <ProfileNavbar
-                darkMode={darkMode}
-                toggleTheme={toggleTheme}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                photo={photo}
-                name={name}
-                getInitials={getInitials}
-            />
-
-            <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-6 py-24 md:py-28 relative z-10">
-                <ProfileHeader
-                    darkMode={darkMode}
-                    name={name}
-                    photo={photo}
-                    getInitials={getInitials}
-                    stats={stats}
-                />
-
-                {/* Content Tabs */}
-                {activeTab === 'overview' && (
-                    <DashboardOverview
-                        darkMode={darkMode}
-                        resumeName={resumeName}
-                        setResumeName={setResumeName}
-                    />
-                )}
-
-                {activeTab === 'courses' && <CourseExplorer darkMode={darkMode} />}
-
-                {activeTab === 'settings' && (
-                    <ProfileSettings
-                        darkMode={darkMode}
-                        name={name} setName={setName}
-                        email={email} setEmail={setEmail}
-                        bio={bio} setBio={setBio}
-                        photo={photo} setPhoto={setPhoto}
-                        resumeName={resumeName} setResumeName={setResumeName}
-                        getInitials={getInitials}
-                    />
-                )}
-            </main>
-
-            {/* Floating Action Buttons Stack */}
-            <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-3 items-end">
-                {/* Mint Skills Button - Global */}
-                <Link to="/nft" className={`group relative flex items-center gap-3 pl-5 pr-5 py-1.5 rounded-full border shadow-2xl backdrop-blur-xl transition-all duration-300 hover:scale-105 ${darkMode ? 'bg-zinc-900/80 border-zinc-700 text-white hover:bg-zinc-800' : 'bg-white/80 border-zinc-200 text-zinc-900 hover:bg-zinc-50'}`}>
-                    <div className="flex flex-col items-end leading-none">
-                        <span className="text-sm font-bold tracking-wide">Mint Skills</span>
-                        <span className="text-[10px] text-indigo-500 font-medium">Web3 Verified</span>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white shadow-lg ring-2 ring-white/20 group-hover:shadow-indigo-500/50 transition-shadow">
-                        <span className="text-xl">💎</span>
-                    </div>
-                </Link>
-
-                {/* Practice Interview Button */}
-                <Link to="/practice" className={`group relative flex items-center gap-3 pl-5 pr-5 py-1.5 rounded-full border shadow-2xl backdrop-blur-xl transition-all duration-300 hover:scale-105 ${darkMode ? 'bg-zinc-900/80 border-zinc-700 text-white hover:bg-zinc-800' : 'bg-white/80 border-zinc-200 text-zinc-900 hover:bg-zinc-50'}`}>
-                    <span className="text-sm font-bold tracking-wide">Practice Interview</span>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg ring-2 ring-white/20 group-hover:shadow-emerald-500/50 transition-shadow">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                    </div>
-                </Link>
-
-                {/* Chat Button */}
-                <Link to="/chat" className={`group relative flex items-center gap-3 pl-5 pr-5 py-1.5 rounded-full border shadow-2xl backdrop-blur-xl transition-all duration-300 hover:scale-105 ${darkMode ? 'bg-zinc-900/80 border-zinc-700 text-white hover:bg-zinc-800' : 'bg-white/80 border-zinc-200 text-zinc-900 hover:bg-zinc-50'}`}>
-                    <span className="text-sm font-bold tracking-wide">Trellis</span>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg ring-2 ring-white/20 group-hover:shadow-indigo-500/50 transition-shadow">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-                    </div>
-                </Link>
-            </div>
-        </div>
-    );
+          <div className="mt-8 grid gap-8 lg:grid-cols-[1.3fr_1fr]">
+            <section aria-labelledby="skills-title"><h2 id="skills-title" className="text-xl font-bold">Skill development</h2>{dashboard.skill_growth.length ? <ul className="mt-3 divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">{dashboard.skill_growth.map((skill) => <li key={skill.id} className="p-4"><div className="flex justify-between gap-4"><div><p className="font-semibold">{skill.name}</p><p className="text-xs capitalize text-zinc-500">{skill.proficiency} · {skill.evidence_count} evidence items</p></div><p className="text-sm font-semibold">{Math.round(skill.confidence * 100)}% confidence</p></div><progress aria-label={`${skill.name} estimated skill`} value={skill.estimated_score} max={1} className="mt-3 h-2 w-full accent-indigo-600" /></li>)}</ul> : <p className="mt-3 text-sm text-zinc-500">Add skills or assessment evidence to see growth.</p>}</section>
+            <div className="space-y-7"><section aria-labelledby="deadlines-title"><h2 id="deadlines-title" className="text-xl font-bold">Upcoming deadlines</h2>{dashboard.deadlines.length ? <ul className="mt-3 space-y-2">{dashboard.deadlines.map((deadline) => <li key={deadline.milestone_id} className="rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900"><p className="font-semibold">{deadline.title}</p><p className="mt-1 text-zinc-500">{formatDate(deadline.deadline)}</p></li>)}</ul> : <p className="mt-2 text-sm text-zinc-500">No upcoming deadlines.</p>}</section><section aria-labelledby="assessment-title"><h2 id="assessment-title" className="text-xl font-bold">Recent assessments</h2>{dashboard.recent_assessments.length ? <ul className="mt-3 space-y-2">{dashboard.recent_assessments.map((assessment) => <li key={assessment.id} className="flex justify-between rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900"><span className="capitalize">{assessment.assessment_type}{assessment.provisional ? ' · provisional' : ''}</span><strong>{Math.round(assessment.score * 100)}%</strong></li>)}</ul> : <p className="mt-2 text-sm text-zinc-500">No assessments yet.</p>}</section>{dashboard.blockers.length > 0 && <section aria-labelledby="blockers-title"><h2 id="blockers-title" className="text-xl font-bold">Blockers</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-300">{dashboard.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></section>}</div>
+          </div>
+        </>}
+    </main>
+  </div>
 }
-
-export default Profile;
