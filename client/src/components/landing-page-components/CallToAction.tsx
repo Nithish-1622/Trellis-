@@ -23,7 +23,7 @@ const CallToAction: React.FC<CallToActionProps> = ({ darkMode }) => {
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">Future Career?</span>
                             </h2>
                             <p className={`text-xl mb-10 max-w-2xl mx-auto ${darkMode ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                                Join Educat-AI today and experience the personalized learning journey that adapts to your goals and pace.
+                                Join Trellis today and experience the personalized learning journey that adapts to your goals and pace.
                             </p>
 
                             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

@@ -25,14 +25,14 @@ const steps = [
         title: 'Generate Path',
         icon: '🗺️',
         desc: 'Receive a step-by-step verifiable roadmap.',
-        details: 'Your roadmap is dynamic. As you verify skills on-chain, the AI adapts future nodes to keep you on the fastest track.'
+        details: 'Your roadmap is dynamic. As assessments and project evidence demonstrate growth, Trellis proposes focused updates for your approval.'
     },
     {
         id: 4,
         title: 'Earn & Verify',
         icon: '🏆',
-        desc: 'Complete milestones and mint proof of skill.',
-        details: 'Turn your learning into a verifiable on-chain resume that employers trust more than a PDF.'
+        desc: 'Complete milestones and build proof of skill.',
+        details: 'Turn your learning into a practical evidence trail of completed projects, assessments, and demonstrated skill growth.'
     }
 ];
 
@@ -45,7 +45,7 @@ const InteractiveRoadmap: React.FC<InteractiveRoadmapProps> = ({ darkMode }) => 
                 <ScrollReveal animation="fade-in-up">
                     <div className='text-center mb-16'>
                         <h2 className={`text-3xl lg:text-4xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-zinc-900'}`}>
-                            How <span className="text-indigo-500">EducatAI</span> Works
+                            How <span className="text-indigo-500">Trellis</span> Works
                         </h2>
                         <p className={`max-w-2xl mx-auto text-lg ${darkMode ? 'text-zinc-400' : 'text-zinc-600'}`}>
                             A continuous loop of improvements for your career.

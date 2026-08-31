@@ -1,0 +1,77 @@
+name: trellis
+
+services:
+  client:
+    build:
+      context: ./client
+      target: production
+      args:
+        VITE_API_BASE_URL: /api
+    ports:
+      - "8098:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./server
+      target: production
+    ports:
+      - "8088:8000"
+    env_file:
+      - ./server/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mypassword}@db:5432/${POSTGRES_DB:-career_mentor_db}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      PILOT_FEATURE_ENABLED: "true"
+      CORS_ORIGINS: http://localhost:8098
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://127.0.0.1:8000/health/ready', timeout=5).raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  worker:
+    build:
+      context: ./server
+      target: production
+    command: ["python", "-m", "resource_worker"]
+    env_file:
+      - ./server/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mypassword}@db:5432/${POSTGRES_DB:-career_mentor_db}
+      ENVIRONMENT: production
+      DEBUG: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-career_mentor_db}
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pgdata:

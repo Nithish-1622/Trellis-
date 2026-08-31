@@ -1,46 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useThemeContext } from '../../contexts/ThemeContext';
-
-export interface Question {
-    id: number;
-    text: string;
-    keyword: string; // Added keyword for display
-    options: string[];
-}
-
-export const questions: Question[] = [
-    {
-        id: 1,
-        text: "What field interests you the most?",
-        keyword: "Interest",
-        options: ["Software Development", "Data Science", "Design", "Product Management", "Marketing"]
-    },
-    {
-        id: 2,
-        text: "How do you prefer to solve problems?",
-        keyword: "Work Style",
-        options: ["Analyzing data", "Writing code", "Visualizing solutions", "Leading teams", "Communicating ideas"]
-    },
-    {
-        id: 3,
-        text: "What is your preferred work environment?",
-        keyword: "Environment",
-        options: ["Remote", "Office", "Hybrid", "Outdoor"]
-    },
-    {
-        id: 4,
-        text: "What are your strongest skills?",
-        keyword: "Top Skill",
-        options: ["Logic & Math", "Creativity", "Communication", "Organization", "Leadership"]
-    },
-    {
-        id: 5,
-        text: "What is your long-term career goal?",
-        keyword: "Goal",
-        options: ["Founder/Entrepreneur", "Technical Expert", "Corporate Leader", "Freelancer", "Researcher"]
-    }
-];
+import { useThemeContext } from '../../hooks/useThemeContext';
+import { questions } from './questions';
 
 const OnboardingForm: React.FC = () => {
     const navigate = useNavigate();

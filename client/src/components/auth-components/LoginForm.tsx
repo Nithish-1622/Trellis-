@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useThemeContext } from '../../contexts/ThemeContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useThemeContext } from '../../hooks/useThemeContext';
+import { useAuth } from '../../hooks/useAuth';
+import { getErrorCode, getErrorMessage } from '../../utils/errors';
 
 const LoginForm: React.FC = () => {
     const navigate = useNavigate();
@@ -20,12 +21,13 @@ const LoginForm: React.FC = () => {
         try {
             await login(email, password);
             navigate('/profile');
-        } catch (err: any) {
-            console.error(err);
-            if (err.code === 401 || (err.message && (err.message.includes('Invalid credentials') || err.message.includes('Invalid email or password')))) {
+        } catch (error: unknown) {
+            console.error(error);
+            const message = getErrorMessage(error, 'Failed to login');
+            if (getErrorCode(error) === 401 || message.includes('Invalid credentials') || message.includes('Invalid email or password')) {
                 setLoginError("Invalid email or password. Please check your credentials.");
             } else {
-                setLoginError(err.message || "Failed to login");
+                setLoginError(message);
             }
         }
     };

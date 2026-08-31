@@ -1,23 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { account } from '../lib/appwrite';
 import { ID, OAuthProvider } from 'appwrite';
-
-interface AuthContextType {
-    user: any;
-    loading: boolean;
-    error: string | null;
-    login: (email: string, password: string) => Promise<void>;
-    register: (email: string, password: string, name: string) => Promise<void>;
-    logout: () => Promise<void>;
-    loginWithGoogle: () => Promise<void>;
-    loginWithGithub: () => Promise<void>;
-    loginWithLinkedin: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import type { Models } from 'appwrite';
+import { AuthContext } from './auth-context';
+import type { LearnerPreferences } from './auth-context';
+import { getErrorCode, getErrorMessage } from '../utils/errors';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<Models.User<LearnerPreferences> | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -27,9 +17,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const checkUserStatus = async () => {
         try {
-            const accountDetails = await account.get();
+            const accountDetails = await account.get<LearnerPreferences>();
             setUser(accountDetails);
-        } catch (error) {
+        } catch {
             setUser(null);
         } finally {
             setLoading(false);
@@ -41,26 +31,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setError(null);
         try {
             await account.createEmailPasswordSession(email, password);
-            const accountDetails = await account.get();
+            const accountDetails = await account.get<LearnerPreferences>();
             setUser(accountDetails);
-        } catch (err: any) {
+        } catch (error: unknown) {
+            const errorCode = getErrorCode(error)
+            const errorMessage = getErrorMessage(error, 'Login failed')
             // If a session is already active, we should logout the previous user and try logging in again
-            if (err?.message?.includes('prohibited when a session is active') || err?.code === 401) {
+            if (errorMessage.includes('prohibited when a session is active') || errorCode === 401) {
                 try {
                     await account.deleteSession('current');
                     // Retry login
                     await account.createEmailPasswordSession(email, password);
-                    const accountDetails = await account.get();
+                    const accountDetails = await account.get<LearnerPreferences>();
                     setUser(accountDetails);
                     return;
-                } catch (retryErr: any) {
-                    setError(retryErr.message || 'Login failed after retry');
-                    throw retryErr;
+                } catch (retryError: unknown) {
+                    setError(getErrorMessage(retryError, 'Login failed after retry'));
+                    throw retryError;
                 }
             }
 
-            setError(err.message || 'Login failed');
-            throw err;
+            setError(errorMessage);
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -72,9 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             await account.create(ID.unique(), email, password, name);
             await login(email, password);
-        } catch (err: any) {
-            setError(err.message || 'Registration failed');
-            throw err;
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, 'Registration failed'));
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -85,8 +77,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             await account.deleteSession('current');
             setUser(null);
-        } catch (err: any) {
-            setError(err.message || 'Logout failed');
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, 'Logout failed'));
         } finally {
             setLoading(false);
         }
@@ -99,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 window.location.origin + '/profile', // Success
                 window.location.origin + '/login',   // Failure
             );
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
             setError("Google login failed");
         }
@@ -112,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 window.location.origin + '/profile',
                 window.location.origin + '/login',
             );
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
             setError("GitHub login failed");
         }
@@ -125,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 window.location.origin + '/profile',
                 window.location.origin + '/login',
             );
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
             setError("LinkedIn login failed");
         }
@@ -136,12 +128,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             {children}
         </AuthContext.Provider>
     );
-};
-
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
 };

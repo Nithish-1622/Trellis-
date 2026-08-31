@@ -9,9 +9,10 @@ interface ThemeToggleProps {
 const ThemeToggle: React.FC<ThemeToggleProps> = ({ darkMode, toggleTheme, className = '' }) => {
     return (
         <button
+            type="button"
             onClick={toggleTheme}
-            className={`p-2 rounded-full transition-all duration-500 ease-in-out transform hover:scale-110 ${darkMode ? 'bg-white/5 hover:bg-white/10 text-yellow-400' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'} ${className}`}
-            aria-label="Toggle Theme"
+            className={`grid min-h-10 min-w-10 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${darkMode ? 'bg-white/5 text-yellow-300 hover:bg-white/10' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'} ${className}`}
+            aria-label={darkMode ? 'Switch to light theme' : 'Switch to dark theme'}
         >
             {darkMode ? (
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

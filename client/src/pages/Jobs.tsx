@@ -1,10 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { useThemeContext } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useThemeContext } from '../hooks/useThemeContext';
+import { useAuth } from '../hooks/useAuth';
 import BackgroundGradients from '../components/landing-page-components/BackgroundGradients';
-import { Link } from 'react-router-dom';
 import Jobs3DVisual from '../components/jobs-components/Jobs3DVisual';
-import { recommendJobs } from '../services/agentService';
+import { getRecommendedJobs } from '../services/careerService';
+import type { SalaryRange } from '../services/careerService';
+
+const logoColors = [
+    'from-blue-500 to-cyan-500',
+    'from-purple-500 to-pink-500',
+    'from-emerald-500 to-teal-500',
+    'from-indigo-500 to-blue-500',
+    'from-red-500 to-orange-500',
+    'from-violet-500 to-purple-500',
+    'from-orange-400 to-amber-500',
+    'from-slate-500 to-zinc-500',
+    'from-pink-500 to-rose-500',
+    'from-blue-400 to-green-400',
+    'from-green-500 to-emerald-500',
+    'from-rose-500 to-pink-500',
+];
+
+const getLogoColor = (index: number) => logoColors[index % logoColors.length];
+
+const formatSalary = (salaryRange?: SalaryRange) => {
+    if (!salaryRange || (!salaryRange.min && !salaryRange.max)) return 'Competitive';
+    const formatK = (num: number) => `$${Math.round(num / 1000)}k`;
+    if (salaryRange.min && salaryRange.max) {
+        return `${formatK(salaryRange.min)} - ${formatK(salaryRange.max)}`;
+    }
+    return formatK(salaryRange.min || salaryRange.max || 0);
+};
+
+const formatJobType = (jobType?: string): Job['type'] => {
+    if (jobType === 'INTERN' || jobType === 'Internship') return 'Internship';
+    if (jobType === 'CONTRACTOR' || jobType === 'Contract') return 'Contract';
+    return 'Full-time';
+};
 
 interface Job {
     id: string;
@@ -21,42 +53,14 @@ interface Job {
 }
 
 const Jobs: React.FC = () => {
-    const { darkMode, toggleTheme } = useThemeContext();
+    const { darkMode } = useThemeContext();
     const { user } = useAuth();
     const [filter, setFilter] = useState('Recommended');
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const logoColors = [
-        'from-blue-500 to-cyan-500',
-        'from-purple-500 to-pink-500',
-        'from-emerald-500 to-teal-500',
-        'from-indigo-500 to-blue-500',
-        'from-red-500 to-orange-500',
-        'from-violet-500 to-purple-500',
-        'from-orange-400 to-amber-500',
-        'from-slate-500 to-zinc-500',
-        'from-pink-500 to-rose-500',
-        'from-blue-400 to-green-400',
-        'from-green-500 to-emerald-500',
-        'from-rose-500 to-pink-500'
-    ];
-
-    const getLogoColor = (index: number) => {
-        return logoColors[index % logoColors.length];
-    };
-
-    const formatSalary = (salaryRange: any) => {
-        if (!salaryRange || (!salaryRange.min && !salaryRange.max)) return 'Competitive';
-        const formatK = (num: number) => `$${Math.round(num / 1000)}k`;
-        if (salaryRange.min && salaryRange.max) {
-            return `${formatK(salaryRange.min)} - ${formatK(salaryRange.max)}`;
-        }
-        return formatK(salaryRange.min || salaryRange.max);
-    };
-
-    const formatDate = (dateString: string) => {
+    const formatDate = (dateString?: string) => {
         if (!dateString) return 'Recently';
         const date = new Date(dateString);
         const now = new Date();
@@ -76,16 +80,14 @@ const Jobs: React.FC = () => {
 
             try {
                 setLoading(true);
-                const data = await recommendJobs(user.$id);
+                const data = await getRecommendedJobs();
                 // Map API response to Job interface
-                const mappedJobs: Job[] = data.jobs.map((job: any, index: number) => ({
-                    id: job.url || index.toString(), // Use URL or index as ID
+                const mappedJobs: Job[] = data.items.map((job, index) => ({
+                    id: job.id || index.toString(),
                     title: job.title,
                     company: job.company,
                     location: job.location,
-                    type: (job.job_type === 'FULLTIME' ? 'Full-time' :
-                        job.job_type === 'INTERN' ? 'Internship' :
-                            job.job_type ? job.job_type : 'Full-time') as any,
+                    type: formatJobType(job.job_type),
                     salary: formatSalary(job.salary_range),
                     tags: (job.required_skills || []).slice(0, 3), // Take top 3 skills
                     posted: formatDate(job.posted_date),
@@ -95,7 +97,7 @@ const Jobs: React.FC = () => {
                 }));
 
                 setJobs(mappedJobs);
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error('Error fetching jobs:', err);
                 setError('Failed to load job recommendations');
             } finally {
@@ -116,37 +118,9 @@ const Jobs: React.FC = () => {
     });
 
     return (
-        <div className={`min-h-screen font-sans transition-all duration-700 ease-in-out relative flex flex-col ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
+        <div className="relative flex flex-col font-sans">
             <BackgroundGradients />
-
-            {/* Navbar */}
-            <nav className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${darkMode ? 'bg-zinc-950/80 border-zinc-800' : 'bg-white/80 border-zinc-200'}`}>
-                <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-                    <Link to="/profile" className="flex items-center gap-2 group">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${darkMode ? 'bg-zinc-900 group-hover:bg-zinc-800' : 'bg-zinc-100 group-hover:bg-zinc-200'}`}>
-                            <svg className={`w-5 h-5 ${darkMode ? 'text-zinc-400' : 'text-zinc-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                        </div>
-                        <span className="font-semibold text-sm">Back to Profile</span>
-                    </Link>
-
-                    <div className="text-xl font-bold tracking-tight">
-                        Recommended <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-600">Jobs</span>
-                    </div>
-
-                    <button
-                        onClick={toggleTheme}
-                        className={`p-2 rounded-full transition-all duration-300 ${darkMode ? 'bg-zinc-800 text-yellow-400 hover:bg-zinc-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                    >
-                        {darkMode ? (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                        ) : (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                        )}
-                    </button>
-                </div>
-            </nav>
-
-            <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-6 py-24 md:py-28 relative z-10">
+            <main className="relative z-10 mx-auto w-full max-w-5xl flex-1 px-4 py-12 md:px-6">
                 {/* Header Section with 3D Visual */}
                 <div className="flex flex-col md:flex-row items-center justify-between mb-16 gap-10">
                     <div className="text-left md:w-1/2 animate-fade-in-up">

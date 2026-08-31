@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useThemeContext } from '../../contexts/ThemeContext';
+import { useThemeContext } from '../../hooks/useThemeContext';
 
 const RegisterVisual: React.FC = () => {
     const { darkMode } = useThemeContext();
